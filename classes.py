@@ -25,7 +25,7 @@ class _BallBase:
         return np.linalg.norm(self.coords - other.coords) <= (self.size + other.size)
 
     def escaping(self):
-        c = self.coords - self.size
+        c = self.coords
         return np.any(c <= 0) or np.any(c >= self.game.size)
 
 

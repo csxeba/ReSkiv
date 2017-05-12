@@ -34,20 +34,20 @@ def discount_rewards(r):
 
 
 def policy_forward(x):
-    h = np.dot(model['W1'], x) + model["b1"]
-    h = np.tanh(h)
-    dvec = np.dot(model['W2'], h) + model["b2"]
+    h = x @ model["W1"] + model["b1"]
+    h[h < 0.] = 0.
+    dvec = h @ model["W2"] + model["b2"]
     return dvec, h
 
 
-def policy_backward(ep_hout, ep_dlogprob):
+def policy_backward(ep_hstates, ep_dlogprob):
     """ backward pass. (eph is array of intermediate hidden states) """
-    dW2 = np.dot(ep_hout.T, ep_dlogprob).ravel()
-    db2 = ep_hout.sum(axis=1)
-    dh = np.outer(ep_dlogprob, model['W2'])
-    dh[ep_hout <= 0] = 0  # backpro prelu
-    dW1 = np.dot(dh.T, ep_inputs)
-    db1 = dh.sum(axis=1)
+    dW2 = ep_hstates.T @ ep_dlogprob
+    db2 = ep_dlogprob.sum(axis=0)
+    dh = ep_dlogprob @ model["W2"].T
+    dh[ep_hstates <= 0] = 0  # backpro prelu
+    dW1 = ep_inputs.T @ dh
+    db1 = dh.sum(axis=0)
     return {'W1': dW1, 'b1': db1, 'W2': dW2, 'b2': db2}
 
 
@@ -55,9 +55,9 @@ env = Game()
 prev_x = prepro(env.reset())
 D = prev_x.size
 # model initialization
-model = {'W1': np.random.randn(H, D) / np.sqrt(D),
+model = {'W1': np.random.randn(D, H) / np.sqrt(D),
          'b1': np.random.randn(H,) * 4,
-         'W2': np.random.randn(2, H) / np.sqrt(H),
+         'W2': np.random.randn(H, 2) / np.sqrt(H),
          "b2": np.random.randn(2,) * 4}
 
 # update buffers that add up gradients over a batch
@@ -70,6 +70,7 @@ running_reward = None
 reward_sum = 0
 episode_number = 0
 cur_x = prepro(env.step(None)[0])
+r = 0
 while True:
     # preprocess the observation, set input to network to be difference image
     inpt = cur_x - prev_x
@@ -129,7 +130,6 @@ while True:
               .format(episode_number, reward_sum))
         reward_sum = 0
         observation = env.reset()
-        prev_x = None
 
     env.clock.tick(30)
     pygame.display.flip()
