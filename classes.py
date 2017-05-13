@@ -6,6 +6,10 @@ ENEMYSIZE = 5
 PLAYERSIZE = 10
 SQUARESIZE = 20  # will be divided by 2!
 
+ENEMYCOLOR = (0, 0, 200)
+PLAYERCOLOR = (50, 50, 50)
+SQARECOLOR = (100, 100, 100)
+
 
 class _EntityBase:
 
@@ -44,7 +48,7 @@ class _EntityBase:
 
     def teleport(self, destination=None):
         if destination is None:
-            destination = (np.random.uniform(size=2) * self.game.size * 0.95).astype(int)
+            destination = (np.random.uniform(0.05, 0.95, 2) * self.game.size).astype(int)
         self.coords = destination
         self.adjust_coordinates()
         self.draw()
@@ -54,7 +58,7 @@ class EnemyBall(_EntityBase):
 
     def __init__(self, game):
         self._move_generator = self._automove()
-        super().__init__(game, color=(255, 100, 0), size=ENEMYSIZE)
+        super().__init__(game, color=ENEMYCOLOR, size=ENEMYSIZE)
         self.hori = np.random.uniform(size=1)[0] < 0.5
         self.teleport()
         while self.distance(game.player) < game.meandist / 2:
@@ -65,6 +69,8 @@ class EnemyBall(_EntityBase):
         speed = 5
         d = np.array([speed, speed])
         d[int(self.hori)] = 0
+        if np.random.randn() < 0:
+            d *= -1
         while 1:
             if self.escaping():
                 d *= -1
@@ -77,7 +83,7 @@ class EnemyBall(_EntityBase):
 class PlayerBall(_EntityBase):
 
     def __init__(self, game):
-        super().__init__(game, color=(0, 128, 255), size=PLAYERSIZE,
+        super().__init__(game, color=PLAYERCOLOR, size=PLAYERSIZE,
                          coords=game.size // 2)
 
     def move(self, dvec=None):
@@ -98,6 +104,12 @@ class PlayerBall(_EntityBase):
     def dead(self):
         return any(self.touches(other) for other in self.game.enemies)
 
+    def escaping(self):
+        e = super().escaping()
+        if e:
+            print("Escaping!")
+        return e
+
 
 class CleverBall(PlayerBall):
 
@@ -116,8 +128,7 @@ class SpazzBall(PlayerBall):
 class Square(_EntityBase):
 
     def __init__(self, game):
-        color = (50, 75, 50)
-        super().__init__(game, color=color, coords=None, size=SQUARESIZE)
+        super().__init__(game, color=SQARECOLOR, coords=None, size=SQUARESIZE)
         self.teleport()
 
     def draw(self):
