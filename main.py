@@ -17,23 +17,23 @@ def parse_args():
         prog="python3 " + path.split(sys.argv[0])[-1],
         description="Reimplementation of the arcade game: Eskiv"
     )
-    parser.add_argument("--ball-type", nargs=1, default="manual", metavar="",
+    parser.add_argument("--ball-type", nargs=1, default=["manual"], metavar="",
                         choices=("manual", "clever", "spazz"),
                         help="`manual` is controllable, " +
                              "`clever` is ANN driven, " +
                              "`spazz` is brownian (random). " +
                              "Defaults to `manual`")
-    parser.add_argument("--screen", nargs=1, default="450x400", metavar="",
+    parser.add_argument("--screen", nargs=1, default=["450x400"], metavar="",
                         help="supply screen size so: WIDTHxHEIGHT or simply WIDTH " +
                         "for a square size. +"
                         "Defaults to 600x600")
-    parser.add_argument("--fps", nargs=1, default=30, metavar="", type=int,
+    parser.add_argument("--fps", nargs=1, default=[30], metavar="", type=int,
                         help="supply the FPS (Frames Per Second). " +
                              "Defaults to 30")
     ns = parser.parse_args(sys.argv[1:])
 
     try:
-        ns.screen = tuple(map(int, ns.screen.split("x")))
+        ns.screen = tuple(map(int, ns.screen[0].split("x")))
     except ValueError:
         ns.screen = invalid_screen_size()
     if len(ns.screen) > 2 or len(ns.screen) < 1:
@@ -45,7 +45,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    env = Game(args.ball_type, args.fps, args.screen)
+    env = Game(args.ball_type[0], args.fps[0], args.screen)
     env.mainloop()
 
 

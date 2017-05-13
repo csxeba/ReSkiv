@@ -29,7 +29,7 @@ class Game:
         self.points = 0
         return self.step()[0]
 
-    def point(self):
+    def score(self):
         return self.player.touches(self.square)
 
     def step(self, action=None):
@@ -41,10 +41,11 @@ class Game:
         self.player.move(action)
         for e in self.enemies:
             e.move()
-        if self.point():
+        if self.score():
             self.square = Square(self)
             self.enemies.append(EnemyBall(self))
             self.points += 1.
+            print("POINT! Current:", self.points)
         if self.player.dead():
             return pygame.surfarray.array3d(self.screen), -10., 1
         if not self.escape_allowed:

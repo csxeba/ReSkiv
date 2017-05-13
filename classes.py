@@ -117,7 +117,6 @@ class Square(_EntityBase):
         color = (50, 75, 50)
         super().__init__(game, color=color, coords=None, size=20)
         self.teleport()
-        print("RECT @", self.coords)
 
     def draw(self):
         adjust = self.size // 2
