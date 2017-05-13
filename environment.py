@@ -23,7 +23,7 @@ class Game:
         self.points = 0.
 
     def reset(self):
-        self.player = PlayerBall(self)
+        self.player = self.playertype(self)
         self.square = Square(self)
         self.enemies = [EnemyBall(self)]
         self.points = 0
