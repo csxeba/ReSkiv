@@ -51,7 +51,7 @@ def policy_backward(ep_hstates, ep_dlogprob):
     return {'W1': dW1, 'b1': db1, 'W2': dW2, 'b2': db2}
 
 
-env = Game()
+env = Game(ball_type="clever", fps=60, screensize=(450, 400), escape=False)
 prev_x = prepro(env.reset())
 D = prev_x.size
 # model initialization

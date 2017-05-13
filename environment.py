@@ -49,7 +49,7 @@ class Game:
         if self.player.dead():
             return pygame.surfarray.array3d(self.screen), -10., 1
         if not self.escape_allowed:
-            if self.player.esaping():
+            if self.player.escaping():
                 return pygame.surfarray.array3d(self.screen), -10, 1
         return pygame.surfarray.array3d(self.screen), self.points, 0
 
