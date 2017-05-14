@@ -28,10 +28,7 @@ class Game:
         self.fake_labels = np.eye(len(self.actions))
 
     def sample_action(self, probs):
-        arg_action = np.random.choice(np.arange(len(self.actions)), size=1, p=probs)
-        action = np.array(self.actions[arg_action[0]])
-        label = self.fake_labels[arg_action]
-        return action, label
+        return np.random.choice(np.arange(len(self.actions)), size=1, p=probs)
 
     def reset(self):
         self.player = self.playertype(self)
@@ -53,7 +50,7 @@ class Game:
         self.screen.fill((0, 0, 0))
 
         self.square.draw()
-        self.player.move(action)
+        self.player.move(self.actions[action])
         for e in self.enemies:
             e.move()
         if self.score():
@@ -61,13 +58,13 @@ class Game:
             self.enemies.append(EnemyBall(self))
             self.steps_taken = 0
             self.points += 5
-            reward += 10
+            reward += 0.7
         if self.player.dead():
-            reward -= 10
+            reward -= 0.4
             done = 1
         if not self.escape_allowed:
             if self.player.escaping():
-                reward -= 10
+                reward -= 0.1
                 done = 1
         return pygame.surfarray.array3d(self.screen), reward, done
 

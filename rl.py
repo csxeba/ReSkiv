@@ -29,7 +29,7 @@ else:
                         Dense(100, lmbd=0.1), Tanh(),
                         Dense(9, lmbd=0.1)])
 
-Xs, hs, fake_Ys, rwrds = [], [], [], []
+Xs, probs, actions_taken, rwrds = [], [], [], []
 running_reward = 0
 reward_sum = 0
 episode_number = 0
@@ -39,15 +39,16 @@ while True:
     print("\rFrame: {:>5}, Reward: {:>5.2f}".format(frames_seen, reward_sum), end="")
     # preprocess the observation, set input to network to be difference image
     # forward the policy network and sample an action from the returned probability
-    probs = model.predict(current_frame[None, :]).ravel()
+    prob = model.predict(current_frame[None, :]).ravel()
+    argaction = env.sample_action(prob)
 
     # record various intermediates (needed later for backprop)
     Xs.append(current_frame)  # observation
-    action, fake_label = env.sample_action(probs)
-    fake_Ys.append(fake_label)
+    actions_taken.append(argaction)
+    probs.append(prob)
 
     # step the environment and get new measurements
-    info = env.step(action)
+    info = env.step(argaction)
     if info is None:
         break
     current_frame, reward, done = info
@@ -60,8 +61,11 @@ while True:
         episode_number += 1
 
         ep_inputs = np.vstack(Xs)
-        ep_fake_Ys = np.vstack(fake_Ys)
+        ep_outputs = np.vstack(probs)
+        ep_args = np.vstack(actions_taken)
+        ep_fake_Ys = np.copy(ep_outputs)
         ep_rewards = np.vstack(rwrds)
+        ep_fake_Ys[ep_args] = ep_rewards
         Xs, hs, fake_Ys, rwrds = [], [], [], []  # reset array memory
 
         model.learn_batch(ep_inputs, ep_fake_Ys, ep_rewards, learning_rate, decay_rate)
