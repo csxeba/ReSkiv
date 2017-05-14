@@ -104,12 +104,6 @@ class PlayerBall(_EntityBase):
     def dead(self):
         return any(self.touches(other) for other in self.game.enemies)
 
-    def escaping(self):
-        e = super().escaping()
-        if e:
-            print("Escaping!")
-        return e
-
 
 class CleverBall(PlayerBall):
 

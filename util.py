@@ -14,3 +14,21 @@ def calc_meand(screensize):
     a1 = (5/2)*(Lw2/Lh)*np.log((Lh + d) / Lw)
     a2 = d*(3 - (Lw2/Lh2) - (Lh2/Lw2))
     return (1/15) * ((Lw3/Lh2)+(Lh3/Lw2)+a2+a1)
+
+
+def prepro(I, ds=4):
+    I = I[::ds, ::ds, 2]  # downsample by factor of 4
+    I[I != 0] = 1  # set foreground to 1
+    return I.astype(np.float).ravel()
+
+
+def discount_rewards(rwd, gamma=0.99):
+    """ take 1D float array of rewards and compute discounted reward """
+    discounted_r = np.zeros_like(rwd)
+    running_add = 0
+    for t in reversed(range(rwd.size)):
+        if rwd[t] != 0:
+            running_add = 0  # reset the sum, since this was a game boundary
+        running_add = running_add * gamma + rwd[t]
+        discounted_r[t] = running_add
+    return discounted_r
