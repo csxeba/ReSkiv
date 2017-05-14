@@ -10,6 +10,9 @@ ENEMYCOLOR = (0, 0, 200)
 PLAYERCOLOR = (50, 50, 50)
 SQARECOLOR = (100, 100, 100)
 
+PLAYERSPEED = 7
+ENEMYSPEED = 5
+
 
 class _EntityBase:
 
@@ -63,11 +66,9 @@ class EnemyBall(_EntityBase):
         self.teleport()
         while self.distance(game.player) < game.meandist / 2:
             self.teleport()
-        print("New enemy @", self.coords)
 
     def _automove(self):
-        speed = 5
-        d = np.array([speed, speed])
+        d = np.array([ENEMYSPEED]*2)
         d[int(self.hori)] = 0
         if np.random.randn() < 0:
             d *= -1
@@ -87,18 +88,17 @@ class PlayerBall(_EntityBase):
                          coords=game.size // 2)
 
     def move(self, dvec=None):
-        speed = 7
         if dvec is None:
             action = pygame.key.get_pressed()
             dvec = np.array([0, 0])
             if action[pygame.K_UP]:
-                dvec[1] -= speed
+                dvec[1] -= PLAYERSPEED
             if action[pygame.K_DOWN]:
-                dvec[1] += speed
+                dvec[1] += PLAYERSPEED
             if action[pygame.K_LEFT]:
-                dvec[0] -= speed
+                dvec[0] -= PLAYERSPEED
             if action[pygame.K_RIGHT]:
-                dvec[0] += speed
+                dvec[0] += PLAYERSPEED
         super().move(dvec)
 
     def dead(self):
@@ -113,10 +113,10 @@ class PlayerBall(_EntityBase):
 
 class CleverBall(PlayerBall):
 
-    def move(self, dvec=None):
-        if dvec is None:
-            dvec = np.array([0, 0])
-        _EntityBase.move(self, dvec)
+    def move(self, action: np.ndarray=None):
+        if action is None:
+            action = np.array([0, 0])
+        _EntityBase.move(self, action * PLAYERSPEED)
 
 
 class SpazzBall(PlayerBall):

@@ -108,6 +108,16 @@ def experience_replay(bsize):
         memory.append(exp)
 
 
+def save_img():
+    if 'images' not in os.listdir('.'):
+        os.mkdir('images')
+    frame_count = it.count()
+    while True:
+        scrn = (yield)
+        plt.imshow(scrn, interpolation='none')
+        plt.savefig('images/%04i.png' % (frame_count.next(),))
+
+
 nb_epochs = 10000
 batch_size = 64
 epsilon = 1.
@@ -121,8 +131,8 @@ nb_frames = 4  # Number of frames (i.e., screens) to keep in history
 # Recipe of deep reinforcement learning model
 model = Sequential()
 model.add(BatchNormalization(axis=1, input_shape=(nb_frames, GRID_SIZE, GRID_SIZE)))
-model.add(Convolution2D(16, (3, 3), activation='relu'))
-model.add(Convolution2D(32, (3, 3), activation='relu'))
+model.add(Convolution2D(16, (3, 3), data_format="channels_first", activation='relu'))
+model.add(Convolution2D(32, (3, 3), data_format="channels_first", activation='relu'))
 model.add(Flatten())
 model.add(Dense(256, activation='relu'))
 model.add(Dense(nb_actions))
@@ -180,16 +190,6 @@ for i in range(nb_epochs):
     if (i + 1) % 100 == 0:
         print('Epoch %6i/%i, loss: %.6f, epsilon: %.3f'
               % (i + 1, nb_epochs, loss, epsilon))
-
-
-def save_img():
-    if 'images' not in os.listdir('.'):
-        os.mkdir('images')
-    frame_count = it.count()
-    while True:
-        scrn = (yield)
-        plt.imshow(scrn, interpolation='none')
-        plt.savefig('images/%04i.png' % (frame_count.next(),))
 
 
 img_saver = save_img()

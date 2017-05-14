@@ -21,18 +21,23 @@ class Game:
         self.square = None
         self.enemies = None
         self.points = 0.
+        self.steps_taken = 0
 
     def reset(self):
         self.player = self.playertype(self)
         self.square = Square(self)
         self.enemies = [EnemyBall(self)]
         self.points = 0
+        self.steps_taken = 0
         return self.step()[0]
 
     def score(self):
         return self.player.touches(self.square)
 
     def step(self, action=None):
+        self.steps_taken += 1
+        if self.steps_taken >= 200:
+            return pygame.surfarray.array3d(self.screen), -10, 1
         if any([e.type == pygame.QUIT for e in pygame.event.get()]):
             return pygame.surfarray.array3d(self.screen), self.points, 1
         self.screen.fill((0, 0, 0))

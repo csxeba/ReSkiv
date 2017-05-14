@@ -1,6 +1,8 @@
 import numpy as np
 import pygame
 
+from ann import Network, Dense, ReLU
+
 from environment import Game
 
 # hyperparameters
@@ -21,107 +23,68 @@ def prepro(I):
     return I.astype(np.float).ravel()
 
 
-def discount_rewards(r):
+def discount_rewards(rwd):
     """ take 1D float array of rewards and compute discounted reward """
-    discounted_r = np.zeros_like(r)
+    discounted_r = np.zeros_like(rwd)
     running_add = 0
-    for t in reversed(range(r.size)):
-        if r[t] != 0:
-            running_add = 0  # reset the sum, since this was a game boundary (pong specific!)
-        running_add = running_add * gamma + r[t]
+    for t in reversed(range(rwd.size)):
+        if rwd[t] != 0:
+            running_add = 0  # reset the sum, since this was a game boundary
+        running_add = running_add * gamma + rwd[t]
         discounted_r[t] = running_add
     return discounted_r
 
 
-def policy_forward(x):
-    h = x @ model["W1"] + model["b1"]
-    h[h < 0.] = 0.
-    dvec = h @ model["W2"] + model["b2"]
-    return dvec, h
-
-
-def policy_backward(ep_hstates, ep_dlogprob):
-    """ backward pass. (eph is array of intermediate hidden states) """
-    dW2 = ep_hstates.T @ ep_dlogprob
-    db2 = ep_dlogprob.sum(axis=0)
-    dh = ep_dlogprob @ model["W2"].T
-    dh[ep_hstates <= 0] = 0  # backpro prelu
-    dW1 = ep_inputs.T @ dh
-    db1 = dh.sum(axis=0)
-    return {'W1': dW1, 'b1': db1, 'W2': dW2, 'b2': db2}
-
-
 env = Game(ball_type="clever", fps=60, screensize=(450, 400), escape=False)
-prev_x = prepro(env.reset())
-D = prev_x.size
+actions = [(-1, -1), (-1, 0), (-1, 1),
+           (0, -1), (0, 0), (0, 1),
+           (1, -1), (1, 0), (1, 1)]
+fake_labels = np.eye(len(actions))
+
+previous_frame = prepro(env.reset())
+current_frame = prepro(env.step(None)[0])
+D = previous_frame.size
+
 # model initialization
-model = {'W1': np.random.randn(D, H) / np.sqrt(D),
-         'b1': np.random.randn(H,) * 4,
-         'W2': np.random.randn(H, 2) / np.sqrt(H),
-         "b2": np.random.randn(2,) * 4}
+model = Network(D, [Dense(H), ReLU(), Dense(9)])
 
-# update buffers that add up gradients over a batch
-grad_buffer = {k: np.zeros_like(v) for k, v in model.items()}
-# rmsprop memory
-rmsprop_cache = {k: np.zeros_like(v) for k, v in model.items()}
-
-inputs, hs, dlogps, drs = [], [], [], []
+Xs, hs, fake_Ys, rwrds = [], [], [], []
 running_reward = None
 reward_sum = 0
 episode_number = 0
-cur_x = prepro(env.step(None)[0])
 r = 0
+frames_seen = 1
 while True:
+    print("\rFrame: {:>5}, Reward: {:>5}".format(frames_seen, reward_sum), end="")
     # preprocess the observation, set input to network to be difference image
-    inpt = cur_x - prev_x
-    prev_x = cur_x
+    inpt = current_frame - previous_frame
+    previous_frame = current_frame
 
     # forward the policy network and sample an action from the returned probability
-    output, hstate = policy_forward(inpt)
+    probs = model.predict(inpt[None, :]).ravel()
 
     # record various intermediates (needed later for backprop)
-    inputs.append(inpt)  # observation
-    hs.append(hstate)  # hidden state
-
-    # grad that encourages the action that was taken to be taken
-    # (see http://cs231n.github.io/neural-networks-2/#losses if confused)
-    dlogps.append(output)
+    Xs.append(inpt)  # observation
+    arg_action = np.random.choice(np.arange(len(actions)), size=1, p=probs)
+    action = np.array(actions[arg_action[0]])
+    fake_Ys.append(fake_labels[arg_action])
 
     # step the environment and get new measurements
-    cur_x, reward, done = env.step(output)
-    cur_x = prepro(cur_x)
+    current_frame, reward, done = env.step(action)
+    current_frame = prepro(current_frame)
     reward_sum += reward
 
-    drs.append(reward)  # record reward (has to be done after we call step() to get reward for previous action)
+    rwrds.append(reward)  # record reward
 
-    if done:  # an episode finished
+    if done:
         episode_number += 1
 
-        # stack together all inputs, hidden states, action gradients, and rewards for this episode
-        ep_inputs = np.vstack(inputs)
-        ep_hstates = np.vstack(hs)
-        ep_dlogprob = np.vstack(dlogps)
-        ep_rewards = np.vstack(drs)
-        inputs, hs, dlogps, drs = [], [], [], []  # reset array memory
+        ep_inputs = np.vstack(Xs)
+        ep_fake_Ys = np.vstack(fake_Ys)
+        ep_rewards = np.vstack(rwrds)
+        Xs, hs, fake_Ys, rwrds = [], [], [], []  # reset array memory
 
-        # compute the discounted reward backwards through time
-        discounted_epr = discount_rewards(ep_rewards)
-        # standardize the rewards to be unit normal (helps control the gradient estimator variance)
-        discounted_epr -= discounted_epr.mean()
-        discounted_epr /= discounted_epr.std()
-
-        ep_dlogprob *= discounted_epr  # modulate the gradient with advantage (PG magic happens right here.)
-        grad = policy_backward(ep_hstates, ep_dlogprob)
-        for k in model:
-            grad_buffer[k] += grad[k]  # accumulate grad over batch
-
-        # perform rmsprop parameter update every batch_size episodes
-        if episode_number % batch_size == 0:
-            for k, v in model.items():
-                g = grad_buffer[k]  # gradient
-                rmsprop_cache[k] = decay_rate * rmsprop_cache[k] + (1 - decay_rate) * g ** 2
-                model[k] += learning_rate * g / (np.sqrt(rmsprop_cache[k]) + 1e-5)
-                grad_buffer[k] = np.zeros_like(v)  # reset batch gradient buffer
+        model.learn_batch(ep_inputs, ep_fake_Ys, ep_rewards, learning_rate, decay_rate)
 
         # boring book-keeping
         running_reward = (reward_sum if running_reward is None else
@@ -130,6 +93,8 @@ while True:
               .format(episode_number, reward_sum))
         reward_sum = 0
         observation = env.reset()
+        done = False
 
+    frames_seen += 1
     env.clock.tick(30)
     pygame.display.flip()
