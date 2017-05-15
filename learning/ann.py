@@ -152,6 +152,7 @@ class Network:
             self.layers.append(layer)
             if layer.trainable:
                 self.memory.append((np.zeros_like(layer.W), np.zeros_like(layer.b)))
+        self.cost = cross_entropy
         self.optimizer = RMSProp(**optimizer_params)
 
     @staticmethod
@@ -188,6 +189,7 @@ class Network:
     def backpropagate(self, error):
         for layer in self.layers[-1:0:-1]:
             error = layer.backpropagate(error)
+        return error
 
     def epoch(self, X, Y, discount_rwds=None, bsize=50):
         assert len(X) == len(Y)

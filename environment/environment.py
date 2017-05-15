@@ -57,8 +57,7 @@ class Game:
             rwd += 3.
         if self.player.dead():
             done = 1
-            self.points -= 1
-            rwd -= 1
+            rwd -= 1.
         if not self.escape_allowed:
             if self.player.escaping():
                 done = 1
@@ -70,7 +69,8 @@ class Game:
         reward = None
         running_reward = None
         steps_taken = 0
-        print("Age: 1")
+        episodes = 1
+        print("Episode: 1")
         while 1:
             steps_taken += 1
             if any([e.type == pygame.QUIT for e in pygame.event.get()]):
@@ -87,16 +87,23 @@ class Game:
                 running_reward = reward
             if reward:
                 running_reward += running_reward * 0.99 + reward * 0.01
-                self.agent.update(reward)
+                print()
+                self.agent.accumulate(reward)
                 steps_taken = 0
             if steps_taken >= 3000:
-                self.agent.update(-1.)
+                print()
+                self.agent.accumulate(-1.)
                 steps_taken = 0
             if done:
                 self.reset()
-                print("Age:", self.agent.age)
+                episodes += 1
+                print("Episode:", episodes, end="")
                 steps_taken = 0
-
+                if episodes % 10 == 0:
+                    print(" performing update!")
+                    self.agent.update()
+                else:
+                    print()
             print("\rStep count: {:>5}, Points: {:.0f}"
                   .format(steps_taken, self.points),
                   end="")

@@ -49,6 +49,7 @@ class CleverAgent(AgentBase):
         self.Ys = []
         self.args = []
         self.rewards = []
+        self.gradients = np.zeros_like(network.get_gradients())
 
     def reset(self):
         self.Xs = []
@@ -65,14 +66,27 @@ class CleverAgent(AgentBase):
         self.Ys.append(label)
         return np.array(direction) * self.speed
 
-    def update(self, reward):
+    def accumulate(self, reward):
+        print("ANN gradient accumulation...")
         Xs = np.vstack(self.Xs)
         Ys = np.vstack(self.Ys)
         drwds = discount_rewards(np.array(self.rewards[1:] + [reward]))
 
-        self.network.epoch(Xs, Ys, bsize=None, discount_rwds=drwds)
-        super().update(reward)
+        preds = self.network.predict(Xs)
+        delta = (preds - Ys) * drwds
+        self.network.backpropagate(delta)
+        self.gradients += self.network.get_gradients()
         self.reset()
+
+    def update(self, reward):
+        print("ANN gradient update")
+        self.accumulate(reward)
+        net = self.network
+        update = net.optimizer(W=net.get_weights(),
+                               gW=net.get_gradients())
+        net.set_weights(update)
+        self.gradients = np.zeros_like(self.gradients)
+        super().update(reward)
 
 
 class SpazzAgent(AgentBase):
