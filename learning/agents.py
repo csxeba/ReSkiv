@@ -2,8 +2,9 @@ import abc
 
 import numpy as np
 import pygame
-# hyperparameters
-from utilities.util import prepro, discount_rewards
+
+from utilities import prepro, discount_rewards
+from learning.ann import RMSProp
 
 
 class AgentBase(abc.ABC):
@@ -53,6 +54,7 @@ class CleverAgent(AgentBase):
         self.args = []
         self.rewards = []
         self.gradients = np.zeros_like(network.get_gradients())
+        self.optimizer = RMSProp()
 
     def reset(self):
         self.Xs = []
@@ -63,7 +65,7 @@ class CleverAgent(AgentBase):
     def sample_vector(self, frame, prev_reward):
         self.rewards.append(prev_reward)
         X = prepro(frame)
-        probs = self.network.predict(X[None, :])[0]
+        probs = self.network.prediction(X[None, :])[0]
         arg, direction, label = self.game.sample_action(probs)
         self.Xs.append(X)
         self.Ys.append(label)
@@ -75,17 +77,19 @@ class CleverAgent(AgentBase):
         Ys = np.vstack(self.Ys)
         drwds = discount_rewards(np.array(self.rewards[1:] + [reward]))
 
-        preds = self.network.predict(Xs)
+        preds = self.network.prediction(Xs)
         delta = (preds - Ys) * drwds
-        self.network.backpropagate(delta)
+        self.network.backpropagation(delta)
         self.gradients += self.network.get_gradients()
         self.reset()
 
     def update(self):
         print("ANN gradient update")
         net = self.network
-        update = net.optimizer(W=net.get_weights(),
-                               gW=net.get_gradients())
+        update = self.optimizer.optimize(
+            W=net.get_weights(),
+            gW=net.get_gradients()
+        )
         net.set_weights(update)
         self.gradients = np.zeros_like(self.gradients)
 

@@ -14,7 +14,7 @@ class SGD:
     def __init__(self, eta=0.01):
         self.eta = eta
 
-    def __call__(self, W, gW):
+    def optimize(self, W, gW):
         return W - gW * self.eta
 
 
@@ -26,7 +26,7 @@ class RMSProp:
         self.epsilon = epsilon
         self.mW = 0.
 
-    def __call__(self, W, gW):
+    def optimize(self, W, gW):
         self.mW = self.decay * self.mW + (1. - self.decay) * gW ** 2.
         W -= ((self.eta * gW) / np.sqrt(self.mW + self.epsilon))
         return W
@@ -181,14 +181,14 @@ class Network:
             Dense(outshape, lmbd=lmbd_global)
         ))
 
-    def predict(self, X):
+    def prediction(self, X):
         for layer in self.layers:
             X = layer.feedforward(X)
         return self.softmax(X)
 
-    def backpropagate(self, error):
+    def backpropagation(self, error):
         for layer in self.layers[-1:0:-1]:
-            error = layer.backpropagate(error)
+            error = layer.backpropagation(error)
         return error
 
     def epoch(self, X, Y, discount_rwds=None, bsize=50):
@@ -214,17 +214,17 @@ class Network:
               .format(1., np.mean(costs)))
 
     def learn_batch(self, X, Y, discount_rwds=None):
-        predictions = self.predict(X)
+        predictions = self.prediction(X)
         cost = cross_entropy(predictions, Y)
         network_delta = predictions - Y
         if discount_rwds is not None:
             network_delta *= discount_rwds
-        self.backpropagate(network_delta)
+        self.backpropagation(network_delta)
         self.set_weights(self.optimizer(self.get_weights(), self.get_gradients()))
         return cost
 
     def evaluate(self, X, Y):
-        pred = self.predict(X)
+        pred = self.prediction(X)
         cost = cross_entropy(pred, Y) / Y.shape[0]
         pred_cls = pred.argmax(axis=1)
         Y_cls = Y.argmax(axis=1)

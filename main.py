@@ -5,7 +5,6 @@ from os import path
 from argparse import ArgumentParser
 
 from learning.agents import *
-from learning.ann import *
 from environment import Game
 
 
@@ -30,15 +29,53 @@ def reparse_screensize(ns):
     return ns
 
 
+def build_brain(inshape, outshape, lambda_):
+    from learning.ann import Network
+    inshape = np.prod(inshape) // 16
+    return Network.default(inshape, outshape, lmbd_global=lambda_)
+
+
+def forge_brain(inshape, outshape):
+    from brainforge import Network
+    from brainforge.layers import DenseLayer
+    inshape = np.prod(inshape) // 16
+    brain = Network(inshape, layers=(
+        DenseLayer(200, activation="tanh"),
+        DenseLayer(60, activation="tanh"),
+        DenseLayer(outshape, activation="softmax")
+    ))
+    brain.finalize("xent", "rmsprop")
+    return brain
+
+
+def forge_convnet(inshape, outshape):
+    from brainforge import Network
+    from brainforge.layers import (
+        ConvLayer, Flatten, DenseLayer
+    )
+    inshape = [1] + [sh // 4 for sh in inshape]
+    brain = Network(inshape, layers=[
+        ConvLayer(3, 9, 9, activation="tanh"),
+        ConvLayer(1, 3, 3, activation="tanh"),
+        ConvLayer(1, 3, 3, activation="tanh"),
+        Flatten(), DenseLayer(200, activation="tanh"),
+        DenseLayer(60, activation="tanh"),
+        DenseLayer(outshape, activation="softmax")
+    ])
+    brain.finalize("xent", "rmsprop")
+    return brain
+
+
 def resolve_agent_type(env, ns):
+    from learning.ann import Network
     agentspec = ns.agent[0]
     if agentspec[-4:] == ".pgz":
         return CleverAgent(
             env, PLAYERSPEED, network=Network.load(agentspec)
         )
     agent = {
-        "clever": CleverAgent(env, PLAYERSPEED, Network.default(
-            inshape=np.prod(ns.screen) // 16,
+        "clever": CleverAgent(env, PLAYERSPEED, forge_convnet(
+            inshape=ns.screen,
             outshape=len(env.actions))
         ),
         "human": ManualAgent(env, PLAYERSPEED, None),

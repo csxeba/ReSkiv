@@ -20,7 +20,7 @@ def prepro(I, ds=4):
     I = I[::ds, ::ds, 2].astype(float)
     I -= I.mean()
     I /= I.std()
-    return I.ravel()
+    return I[:, :, None]
 
 
 def discount_rewards(rwd, gamma=0.99):
