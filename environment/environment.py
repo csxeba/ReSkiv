@@ -35,7 +35,6 @@ class Game:
         self.square = Square(self)
         self.enemies = [EnemyBall(self)]
         self.points = 0.
-        self.steps_taken = 0
         self.nopoint = 1
         return self.step(np.array([0, 0]))[0]
 
@@ -60,6 +59,7 @@ class Game:
             rwd -= 1.
         if not self.escape_allowed:
             if self.player.escaping():
+                rwd -= 1.
                 done = 1
         return pygame.surfarray.array3d(self.screen), rwd, done
 

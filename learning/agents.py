@@ -19,7 +19,10 @@ class AgentBase(abc.ABC):
     def sample_vector(self, frame, prev_reward):
         raise NotImplementedError
 
-    def update(self, reward):
+    def accumulate(self, rewards):
+        pass
+
+    def update(self):
         self.age += 1
 
 
@@ -78,15 +81,13 @@ class CleverAgent(AgentBase):
         self.gradients += self.network.get_gradients()
         self.reset()
 
-    def update(self, reward):
+    def update(self):
         print("ANN gradient update")
-        self.accumulate(reward)
         net = self.network
         update = net.optimizer(W=net.get_weights(),
                                gW=net.get_gradients())
         net.set_weights(update)
         self.gradients = np.zeros_like(self.gradients)
-        super().update(reward)
 
 
 class SpazzAgent(AgentBase):

@@ -76,7 +76,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    env = Game(args.fps[0], args.screen)
+    env = Game(args.fps[0], args.screen, escape_allowed=False)
     agent = resolve_agent_type(env, args)
     env.reset(agent)
     env.mainloop()
