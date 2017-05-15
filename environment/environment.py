@@ -18,9 +18,8 @@ class Game:
         self.enemies = None
         self.points = 0.
         self.nopoint = 1
-        self.steps_taken = 0
         self.actions = [(-1, -1), (-1, 0), (-1, 1),
-                        (0, -1), (0, 1),
+                        (0, -1), (0, 0), (0, 1),
                         (1, -1), (1, 0), (1, 1)]
         self.labels = np.eye(len(self.actions))
 
@@ -54,26 +53,26 @@ class Game:
         if self.score():
             self.square = Square(self)
             self.enemies.append(EnemyBall(self))
-            self.steps_taken = 0
             self.points += 1.
             rwd += 3.
         if self.player.dead():
             done = 1
             self.points -= 1
+            rwd -= 1
         if not self.escape_allowed:
             if self.player.escaping():
                 done = 1
-        return pygame.surfarray.array3d(self.screen), self.points, done
+        return pygame.surfarray.array3d(self.screen), rwd, done
 
     def mainloop(self):
-        if any(prop is None for prop in (self.player, self.enemies, self.square)):
-            self.reset()
         tock = self.fps
-        frame = np.zeros(self.size.tolist() + [3])
+        frame = self.reset()
         reward = None
+        running_reward = None
+        steps_taken = 0
         print("Age: 1")
         while 1:
-            self.steps_taken += 1
+            steps_taken += 1
             if any([e.type == pygame.QUIT for e in pygame.event.get()]):
                 return
             dvec = self.agent.sample_vector(frame, reward)
@@ -81,19 +80,25 @@ class Game:
 
             if info is None:
                 break
+
             frame, reward, done = info
-            if self.steps_taken >= 3000:
-                done = 1
-                # reward = -50.
-            if done:
-                print()
+
+            if running_reward is None:
+                running_reward = reward
+            if reward:
+                running_reward += running_reward * 0.99 + reward * 0.01
                 self.agent.update(reward)
+                steps_taken = 0
+            if steps_taken >= 3000:
+                self.agent.update(-1.)
+                steps_taken = 0
+            if done:
                 self.reset()
-                print("Age: {} running reward: {:>6.2f}"
-                      .format(self.agent.age, self.agent.running_reward))
+                print("Age:", self.agent.age)
+                steps_taken = 0
 
             print("\rStep count: {:>5}, Points: {:.0f}"
-                  .format(self.steps_taken, self.points),
+                  .format(steps_taken, self.points),
                   end="")
 
             self.clock.tick(tock)

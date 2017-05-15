@@ -17,12 +17,13 @@ def calc_meand(screensize):
 
 
 def prepro(I, ds=4):
-    I = I[::ds, ::ds, 2]  # downsample by factor of 4
-    I[I != 0] = 1  # set foreground to 1
-    return I.astype(np.float).ravel()
+    I = I[::ds, ::ds, 2].astype(float)
+    I -= I.mean()
+    I /= I.std()
+    return I.ravel()
 
 
-def discount_rewards(rwd, gamma=0.9):
+def discount_rewards(rwd, gamma=0.99):
     """ take 1D float array of rewards and compute discounted reward """
     discounted_r = np.zeros_like(rwd)
     running_add = 0

@@ -20,7 +20,7 @@ class SGD:
 
 class RMSProp:
 
-    def __init__(self, eta=0.0001, decay=0.9, epsilon=1e-8):
+    def __init__(self, eta=0.001, decay=0.9, epsilon=1e-8):
         self.eta = eta
         self.decay = decay
         self.epsilon = epsilon

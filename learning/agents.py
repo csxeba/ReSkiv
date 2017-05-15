@@ -14,24 +14,13 @@ class AgentBase(abc.ABC):
         self.network = network
         self.age = 1
         self.rewards = []
-        self.running_reward = None
 
     @abc.abstractmethod
     def sample_vector(self, frame, prev_reward):
         raise NotImplementedError
 
-    def reset(self):
-        rws = sum((r for r in self.rewards if r is not None))
-
-        if self.running_reward is None:
-            self.running_reward = rws
-        else:
-            self.running_reward *= 0.9
-            self.running_reward += (rws * 0.1)
-
     def update(self, reward):
         self.age += 1
-        self.reset()
 
 
 class ManualAgent(AgentBase):
@@ -62,7 +51,6 @@ class CleverAgent(AgentBase):
         self.rewards = []
 
     def reset(self):
-        super().reset()
         self.Xs = []
         self.args = []
         self.Ys = []
@@ -84,6 +72,7 @@ class CleverAgent(AgentBase):
 
         self.network.epoch(Xs, Ys, bsize=None, discount_rwds=drwds)
         super().update(reward)
+        self.reset()
 
 
 class SpazzAgent(AgentBase):
