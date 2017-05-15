@@ -44,8 +44,8 @@ class Game:
         return self.player.touches(self.square)
 
     def step(self, dvec):
-        rwd = 0.
         done = 0
+        rwd = 0.
         self.screen.fill((0, 0, 0))
         self.square.draw()
         self.player.move(dvec)
@@ -56,14 +56,14 @@ class Game:
             self.enemies.append(EnemyBall(self))
             self.steps_taken = 0
             self.points += 1.
-            rwd += 1.
+            rwd += 3.
         if self.player.dead():
             done = 1
-            rwd -= 1.
+            self.points -= 1
         if not self.escape_allowed:
             if self.player.escaping():
                 done = 1
-        return pygame.surfarray.array3d(self.screen), rwd, done
+        return pygame.surfarray.array3d(self.screen), self.points, done
 
     def mainloop(self):
         if any(prop is None for prop in (self.player, self.enemies, self.square)):
@@ -82,18 +82,18 @@ class Game:
             if info is None:
                 break
             frame, reward, done = info
-            if self.steps_taken >= 4000:
+            if self.steps_taken >= 3000:
                 done = 1
-                reward = -1
+                # reward = -50.
             if done:
                 print()
                 self.agent.update(reward)
                 self.reset()
-                print("Age: {} running reward: {}"
+                print("Age: {} running reward: {:>6.2f}"
                       .format(self.agent.age, self.agent.running_reward))
 
-            print("\rFrame: {:>5}, Reward: {:>6.2f}"
-                  .format(self.steps_taken, reward),
+            print("\rStep count: {:>5}, Points: {:.0f}"
+                  .format(self.steps_taken, self.points),
                   end="")
 
             self.clock.tick(tock)

@@ -57,7 +57,7 @@ class CleverAgent(AgentBase):
         super().__init__(game, speed, None)
         self.network = network
         self.Xs = []
-        self.raw_Ys = []
+        self.Ys = []
         self.args = []
         self.rewards = []
 
@@ -65,7 +65,7 @@ class CleverAgent(AgentBase):
         super().reset()
         self.Xs = []
         self.args = []
-        self.raw_Ys = []
+        self.Ys = []
         self.rewards = []
 
     def sample_vector(self, frame, prev_reward):
@@ -74,18 +74,15 @@ class CleverAgent(AgentBase):
         probs = self.network.predict(X[None, :])[0]
         arg, direction, label = self.game.sample_action(probs)
         self.Xs.append(X)
-        self.raw_Ys.append(probs)
-        self.args.append(arg)
+        self.Ys.append(label)
         return np.array(direction) * self.speed
 
     def update(self, reward):
         Xs = np.vstack(self.Xs)
-        Ys = np.vstack(self.raw_Ys)
+        Ys = np.vstack(self.Ys)
         drwds = discount_rewards(np.array(self.rewards[1:] + [reward]))
-        drwds -= drwds.mean()
-        drwds /= drwds.std()
 
-        self.network.epoch(Xs, Ys, bsize=100, discount_rwds=drwds)
+        self.network.epoch(Xs, Ys, bsize=None, discount_rwds=drwds)
         super().update(reward)
 
 

@@ -22,13 +22,14 @@ def prepro(I, ds=4):
     return I.astype(np.float).ravel()
 
 
-def discount_rewards(rwd, gamma=0.99):
+def discount_rewards(rwd, gamma=0.9):
     """ take 1D float array of rewards and compute discounted reward """
     discounted_r = np.zeros_like(rwd)
     running_add = 0
     for t in range(len(rwd)-1, -1, -1):
-        if rwd[t] != 0:
-            running_add = 0
         running_add = running_add * gamma + rwd[t]
         discounted_r[t] = running_add
+
+    discounted_r -= discounted_r.mean()
+    discounted_r /= (discounted_r.std() + 1e-8 * 2.)
     return discounted_r[:, None]

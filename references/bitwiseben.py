@@ -182,12 +182,12 @@ for i in range(nb_epochs):
                     targets.append(t)
                     inputs.append(s)
 
-                loss += model.train_on_batch(np.array(inputs), np.array(targets))[0]
+                loss += model.train_on_batch(np.array(inputs), np.array(targets))
 
     except StopIteration:
         pass
 
-    if (i + 1) % 100 == 0:
+    if (i + 1) % 10 == 0:
         print('Epoch %6i/%i, loss: %.6f, epsilon: %.3f'
               % (i + 1, nb_epochs, loss, epsilon))
 

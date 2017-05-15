@@ -9,16 +9,24 @@ def cross_entropy2(A: np.ndarray, Y: np.ndarray):
     return -np.sum(Y * np.log(A) + (1. - Y) * np.log(1. - A))
 
 
+class SGD:
+
+    def __init__(self, eta=0.01):
+        self.eta = eta
+
+    def __call__(self, W, gW):
+        return W - gW * self.eta
+
+
 class RMSProp:
 
-    def __init__(self, eta=0.1, decay=0.9, epsilon=1e-8):
+    def __init__(self, eta=0.0001, decay=0.9, epsilon=1e-8):
         self.eta = eta
         self.decay = decay
         self.epsilon = epsilon
         self.mW = 0.
 
     def __call__(self, W, gW):
-        W, gW = W, gW
         self.mW = self.decay * self.mW + (1. - self.decay) * gW ** 2.
         W -= ((self.eta * gW) / np.sqrt(self.mW + self.epsilon))
         return W
@@ -167,7 +175,7 @@ class Network:
     @classmethod
     def default(cls, inshape, outshape, lmbd_global=0.):
         return cls(inshape, layers=(
-            Dense(200, lmbd=lmbd_global), ReLU(),
+            Dense(200, lmbd=lmbd_global), Tanh(),
             Dense(60, lmbd=lmbd_global), Tanh(),
             Dense(outshape, lmbd=lmbd_global)
         ))
