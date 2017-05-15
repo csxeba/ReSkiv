@@ -11,7 +11,7 @@ def prepro(I):
     I = I[::4, ::4, 2]  # downsample by factor of 4
     return I
 
-game = Game("spazz", 30, (450, 400), escape=False)
+game = Game("spazz", 30, (450, 400), escape_allowed=False)
 frame = game.reset()
 rounds = 1
 while 1:

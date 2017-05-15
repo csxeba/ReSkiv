@@ -10,7 +10,6 @@ ENEMYCOLOR = (0, 0, 200)
 PLAYERCOLOR = (50, 50, 50)
 SQARECOLOR = (100, 100, 100)
 
-PLAYERSPEED = 7
 ENEMYSPEED = 5
 
 
@@ -81,44 +80,6 @@ class EnemyBall(_EntityBase):
         super().move(next(self._move_generator))
 
 
-class PlayerBall(_EntityBase):
-
-    def __init__(self, game):
-        super().__init__(game, color=PLAYERCOLOR, size=PLAYERSIZE,
-                         coords=game.size // 2)
-
-    def move(self, dvec=None):
-        if dvec is None:
-            action = pygame.key.get_pressed()
-            dvec = np.array([0, 0])
-            if action[pygame.K_UP]:
-                dvec[1] -= PLAYERSPEED
-            if action[pygame.K_DOWN]:
-                dvec[1] += PLAYERSPEED
-            if action[pygame.K_LEFT]:
-                dvec[0] -= PLAYERSPEED
-            if action[pygame.K_RIGHT]:
-                dvec[0] += PLAYERSPEED
-        super().move(dvec)
-
-    def dead(self):
-        return any(self.touches(other) for other in self.game.enemies)
-
-
-class CleverBall(PlayerBall):
-
-    def move(self, action: np.ndarray=None):
-        if action is None:
-            action = np.array([0, 0])
-        _EntityBase.move(self, action * PLAYERSPEED)
-
-
-class SpazzBall(PlayerBall):
-
-    def move(self, dvec=None):
-        super().move(np.random.randn(2).astype(int) * 5)
-
-
 class Square(_EntityBase):
 
     def __init__(self, game):
@@ -131,3 +92,13 @@ class Square(_EntityBase):
             self.game.screen, self.color,
             pygame.Rect(self.coords-adjust, [self.size]*2)
         )
+
+
+class PlayerBall(_EntityBase):
+
+    def __init__(self, game):
+        super().__init__(game, color=PLAYERCOLOR, size=PLAYERSIZE,
+                         coords=game.size // 2)
+
+    def dead(self):
+        return any(self.touches(other) for other in self.game.enemies)

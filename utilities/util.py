@@ -26,9 +26,9 @@ def discount_rewards(rwd, gamma=0.99):
     """ take 1D float array of rewards and compute discounted reward """
     discounted_r = np.zeros_like(rwd)
     running_add = 0
-    for t in reversed(range(rwd.size)):
+    for t in range(len(rwd)-1, -1, -1):
         if rwd[t] != 0:
-            running_add = 0  # reset the sum, since this was a game boundary
+            running_add = 0
         running_add = running_add * gamma + rwd[t]
         discounted_r[t] = running_add
-    return discounted_r
+    return discounted_r[:, None]

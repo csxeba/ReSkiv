@@ -1,6 +1,6 @@
 import numpy as np
 
-from ReSkiv.ann import Network, Dense, Tanh
+from learning.ann import Network, Dense, Tanh
 
 
 def build_net():
