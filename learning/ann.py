@@ -1,35 +1,4 @@
-import numpy as np
-
-
-def cross_entropy(A, Y):
-    return -np.sum(Y * np.log(A))
-
-
-def cross_entropy2(A: np.ndarray, Y: np.ndarray):
-    return -np.sum(Y * np.log(A) + (1. - Y) * np.log(1. - A))
-
-
-class SGD:
-
-    def __init__(self, eta=0.01):
-        self.eta = eta
-
-    def optimize(self, W, gW):
-        return W - gW * self.eta
-
-
-class RMSProp:
-
-    def __init__(self, eta=0.001, decay=0.9, epsilon=1e-8):
-        self.eta = eta
-        self.decay = decay
-        self.epsilon = epsilon
-        self.mW = 0.
-
-    def optimize(self, W, gW):
-        self.mW = self.decay * self.mW + (1. - self.decay) * gW ** 2.
-        W -= ((self.eta * gW) / np.sqrt(self.mW + self.epsilon))
-        return W
+from .optimizer import *
 
 
 class _Input:
@@ -53,7 +22,8 @@ class Dense:
 
     def __init__(self, neurons, lmbd=0.01):
         self.trainable = True
-        self.neurons = neurons
+        self.neurons = (neurons if isinstance(neurons, int)
+                        else np.prod(neurons))
         self.lmbd = lmbd
 
         self.W = None
@@ -67,6 +37,8 @@ class Dense:
 
     def connect(self, layer):
         indim = layer.outdim
+        if isinstance(indim, tuple):
+            indim = np.prod(indim)
         self.W = np.random.randn(indim, self.neurons) / indim
         self.gW = np.zeros_like(self.W)
 
@@ -123,6 +95,24 @@ class ReLU:
         return error
 
 
+class Sigmoid:
+
+    def __init__(self):
+        self.trainable = False
+        self.output = None
+        self.outdim = None
+
+    def connect(self, layer):
+        self.outdim = layer.outdim
+
+    def feedforward(self, X):
+        self.output = 1. / (1. + np.exp(-X))
+        return self.output
+
+    def backpropagate(self, error):
+        return error * self.output * (1. - self.output)
+
+
 class Tanh:
 
     def __init__(self):
@@ -143,7 +133,7 @@ class Tanh:
 
 class Network:
 
-    def __init__(self, inshape, layers=(), **optimizer_params):
+    def __init__(self, inshape, layers=(), optimizer="rmsprop"):
         self.layers = []
         self.memory = []  # RMSprop memory
         self.layers.append(_Input(inshape))
@@ -153,7 +143,12 @@ class Network:
             if layer.trainable:
                 self.memory.append((np.zeros_like(layer.W), np.zeros_like(layer.b)))
         self.cost = cross_entropy
-        self.optimizer = RMSProp(**optimizer_params)
+        if isinstance(optimizer, str):
+            self.optimizer = {"sgd": SGD(),
+                              "adam": Adam(),
+                              "rmsprop": RMSProp()}
+        else:
+            self.optimizer = optimizer
 
     @staticmethod
     def load(path):
@@ -188,7 +183,7 @@ class Network:
 
     def backpropagation(self, error):
         for layer in self.layers[-1:0:-1]:
-            error = layer.backpropagation(error)
+            error = layer.backpropagate(error)
         return error
 
     def epoch(self, X, Y, discount_rwds=None, bsize=50):
@@ -220,7 +215,7 @@ class Network:
         if discount_rwds is not None:
             network_delta *= discount_rwds
         self.backpropagation(network_delta)
-        self.set_weights(self.optimizer(self.get_weights(), self.get_gradients()))
+        self.set_weights(self.optimizer.optimize(self.get_weights(), self.get_gradients()))
         return cost
 
     def evaluate(self, X, Y):

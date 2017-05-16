@@ -3,8 +3,8 @@ import abc
 import numpy as np
 import pygame
 
-from utilities import prepro, discount_rewards
-from learning.ann import RMSProp
+from utilities import discount_rewards
+from .optimizer import Adam, cross_entropy
 
 
 class AgentBase(abc.ABC):
@@ -54,7 +54,8 @@ class CleverAgent(AgentBase):
         self.args = []
         self.rewards = []
         self.gradients = np.zeros_like(network.get_gradients())
-        self.optimizer = RMSProp()
+        self.optimizer = Adam()
+        self.recurrent = False
 
     def reset(self):
         self.Xs = []
@@ -62,33 +63,34 @@ class CleverAgent(AgentBase):
         self.Ys = []
         self.rewards = []
 
-    def sample_vector(self, frame, prev_reward):
+    def sample_vector(self, state, prev_reward):
         self.rewards.append(prev_reward)
-        X = prepro(frame)
-        probs = self.network.prediction(X[None, :])[0]
+        probs = self.network.prediction(state[None, :])[0]
         arg, direction, label = self.game.sample_action(probs)
-        self.Xs.append(X)
+        self.Xs.append(state)
         self.Ys.append(label)
         return np.array(direction) * self.speed
 
     def accumulate(self, reward):
-        print("ANN gradient accumulation...")
+        print("ANN gradient accumulation... Policy Cost:", end=" ")
         Xs = np.vstack(self.Xs)
         Ys = np.vstack(self.Ys)
         drwds = discount_rewards(np.array(self.rewards[1:] + [reward]))
+        m = Xs.shape[0]
 
         preds = self.network.prediction(Xs)
-        delta = (preds - Ys) * drwds
+        net_cost = cross_entropy(preds, Ys) / m
+        print("{:.4f}".format(net_cost * drwds.mean()))
+        delta = (preds - Ys) * drwds / m
         self.network.backpropagation(delta)
         self.gradients += self.network.get_gradients()
         self.reset()
 
     def update(self):
-        print("ANN gradient update")
         net = self.network
         update = self.optimizer.optimize(
             W=net.get_weights(),
-            gW=net.get_gradients()
+            gW=net.get_gradients(),
         )
         net.set_weights(update)
         self.gradients = np.zeros_like(self.gradients)
