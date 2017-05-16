@@ -55,7 +55,7 @@ screen = tuple(map(int, screen.split("x")))
 # and to set the colors so, that the entities (enemies, player, square)
 # can be distinguished by the blue channel (the last number)
 
-agent_type = "math"  # Can be one of [clever, manual, spazz, math]
+agent_type = "clever"  # Can be one of [clever, manual, spazz, math]
 
 # Please set this if you intend to use one of the recurrent
 # layer architectures in Brainforge.

@@ -104,18 +104,17 @@ class Game:
             reward_sum += reward
             if running_reward is None:
                 running_reward = reward_sum
-            if reward:
-                print()
-                self.agent.accumulate(reward)
             if self.steps_taken >= max_steps:
                 print()
                 self.agent.accumulate(reward)
+                print("Performing update!")
                 self.steps_taken = 0
-            if done:
+            if self.steps_taken >= max_steps*10 or done:
                 self.episodes += 1
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 self.reset()
-                print("Episode:", self.episodes, end="")
+                print("Episode: {} Running reward: {: .3f}"
+                      .format(self.episodes, running_reward), end="")
                 self.steps_taken = 0
                 if self.episodes % 10 == 0:
                     print(" performing update!")
@@ -123,8 +122,8 @@ class Game:
                 else:
                     print()
 
-            print("\rStep count: {:>5}, Running reward: {: .3f}"
-                  .format(self.steps_taken, running_reward),
+            print("\rStep count: {:>5}, Current reward: {: .3f}"
+                  .format(self.steps_taken, reward),
                   end="")
 
             self.clock.tick(tock)
@@ -139,17 +138,15 @@ class Game:
 
 def _default_reward_function(environment):
     done = 0
-    rwd = 0.
+    rwd = environment.player.distance(environment.square) / (environment.meandist * 2)
     if environment.score():
         environment.square = Square(*environment.ballargs["square"])
         environment.enemies.append(EnemyBall(*environment.ballargs["enemy"]))
         environment.points += 1.
-        rwd = 1.
+
     if environment.player.dead():
         done = 1
-        rwd = -0.5
-    if not environment.escape_allowed:
-        if environment.player.escaping():
-            done = 1
-            rwd = -0.5
+        rwd = 10.
+    if environment.player.escaping():
+        rwd = -1.
     return rwd, done
