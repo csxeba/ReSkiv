@@ -43,9 +43,8 @@ boundaries_kill = True  # whether touching the game boundary kills the player
 # - "pixels" gives pixel values
 state = "statistics"
 
-screen = "500x400"  # has to be divisible by 4!
+screen = "500x400"  # each dimension has to be divisible by 4!
 screen = tuple(map(int, screen.split("x")))
-assert all(s % 4 == 0 for s in screen), "Screen not divisible by 4!"
 
 # Please not two things about colors and screen size:
 # If you use the pixel values to teach the network,
@@ -67,6 +66,11 @@ agent_type = "clever"  # Can be one of [clever, manual, spazz]
 # - GRU: similar to LSTM, but a more recent architecture
 # - ClockworkRNN: similar to RLayer, but faster and better
 agent_is_recurrent = False
+
+if state == "pixels" and not all(d % 4 == 0 for d in screen):
+    msg = "Screen dimensions have to be divisible " + \
+          "by 4 if pixels are used as state!"
+    raise RuntimeError()
 
 
 def build_ann(inshape, outshape):
