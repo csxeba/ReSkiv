@@ -33,9 +33,9 @@ LIGHT_GREY = (100, 100, 100)
 
 
 # Parameters of the environment
-fps = 120  # the higher, the faster the game's pace
+fps = 60  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
-boundaries_kill = True  # whether touching the game boundary kills the player
+boundaries_kill = False  # whether touching the game boundary kills the player
 
 # state determines what input we give to the neural net
 # can be either one of the following:
@@ -55,7 +55,7 @@ screen = tuple(map(int, screen.split("x")))
 # and to set the colors so, that the entities (enemies, player, square)
 # can be distinguished by the blue channel (the last number)
 
-agent_type = "clever"  # Can be one of [clever, manual, spazz]
+agent_type = "math"  # Can be one of [clever, manual, spazz, math]
 
 # Please set this if you intend to use one of the recurrent
 # layer architectures in Brainforge.
@@ -146,7 +146,8 @@ def get_agent(environment, network=None):
     actor = {
         "clever": agent.CleverAgent,
         "manual": agent.ManualAgent,
-        "spazz": agent.SpazzAgent
+        "spazz": agent.SpazzAgent,
+        "math": agent.MathAgent
     }[agent_type](game=environment, speed=player_speed, network=network)
     if agent_type == "clever":
         # Set the optimizer below
@@ -157,15 +158,17 @@ def get_agent(environment, network=None):
 
 def main():
     env = Game(fps=fps, screensize=screen, escape_allowed=(not boundaries_kill),
-               state="statistics",
+               state=state,
                playersize=10, playercolor=DARK_GREY,
                enemysize=5, enemycolor=BLUE,
                squaresize=10, squarecolor=LIGHT_GREY)
-
-    net = build_ann(
-        inshape=env.data_shape,
-        outshape=len(env.actions)
-    )
+    if agent_type == "clever":
+        net = build_ann(
+            inshape=env.data_shape,
+            outshape=len(env.actions)
+        )
+    else:
+        net = None
 
     # the agent name was already taken by the agent module :(
     actor = get_agent(

@@ -132,7 +132,8 @@ class Game:
 
         if not done:
             self.agent.update()
-        self.agent.network.save()
+        if self.agent.type == "clever":
+            self.agent.network.save()
         print("\n-- END PROGRAM --")
 
 
