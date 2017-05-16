@@ -2,20 +2,12 @@ import numpy as np
 import pygame
 
 
-ENEMYSIZE = 5
-PLAYERSIZE = 10
-SQUARESIZE = 20  # will be divided by 2!
-
-ENEMYCOLOR = (0, 0, 200)
-PLAYERCOLOR = (50, 50, 50)
-SQARECOLOR = (100, 100, 100)
-
 ENEMYSPEED = 5
 
 
 class _EntityBase:
 
-    def __init__(self, game, color, coords=None, size=10):
+    def __init__(self, game, color, size, coords=None):
         self.game = game
         self.coords = np.array([-50, -50])
         self.color = color
@@ -58,9 +50,9 @@ class _EntityBase:
 
 class EnemyBall(_EntityBase):
 
-    def __init__(self, game):
+    def __init__(self, game, color, size):
         self._move_generator = self._automove()
-        super().__init__(game, color=ENEMYCOLOR, size=ENEMYSIZE)
+        super().__init__(game, color, size)
         self.hori = np.random.uniform(size=1)[0] < 0.5
         self.teleport()
         while self.distance(game.player) < game.meandist / 2:
@@ -82,8 +74,8 @@ class EnemyBall(_EntityBase):
 
 class Square(_EntityBase):
 
-    def __init__(self, game):
-        super().__init__(game, color=SQARECOLOR, coords=None, size=SQUARESIZE)
+    def __init__(self, game, color, size):
+        super().__init__(game, color, size*2)
         self.teleport()
 
     def draw(self):
@@ -96,9 +88,8 @@ class Square(_EntityBase):
 
 class PlayerBall(_EntityBase):
 
-    def __init__(self, game):
-        super().__init__(game, color=PLAYERCOLOR, size=PLAYERSIZE,
-                         coords=game.size // 2)
+    def __init__(self, game, color, size):
+        super().__init__(game, color, size, game.size // 2)
 
     def dead(self):
         return any(self.touches(other) for other in self.game.enemies)

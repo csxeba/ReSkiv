@@ -17,20 +17,29 @@ def calc_meand(screensize):
 
 
 def prepro(I, ds=4):
-    I = I[::ds, ::ds, 2].astype(float)
-    I -= I.mean()
-    I /= I.std()
-    return I.ravel()
+    """Downsamples and scales an image taken from the environment"""
+    I = I[::ds, ::ds, 2].astype(float) / 255.
+    return I[:, :, None].ravel()
+
+
+def prepro_recurrent(X):
+    """
+    Recurrent networks receive 3-dimensional data.
+    First dim is the time axis,
+    Second is the batch,
+    Third is the actual number of parameters
+    """
+    return X[:, None, None]
 
 
 def discount_rewards(rwd, gamma=0.99):
-    """ take 1D float array of rewards and compute discounted reward """
+    """
+    Compute the discounted reward backwards in time
+    """
     discounted_r = np.zeros_like(rwd)
     running_add = 0
     for t in range(len(rwd)-1, -1, -1):
         running_add = running_add * gamma + rwd[t]
         discounted_r[t] = running_add
 
-    discounted_r -= discounted_r.mean()
-    discounted_r /= (discounted_r.std() + 1e-8 * 2.)
     return discounted_r[:, None]
