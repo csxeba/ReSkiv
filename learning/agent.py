@@ -9,6 +9,8 @@ from .optimizer import Adam, cross_entropy
 
 class AgentBase(abc.ABC):
 
+    type = ""
+
     def __init__(self, game, speed, network):
         self.game = game
         self.speed = speed
@@ -17,7 +19,7 @@ class AgentBase(abc.ABC):
         self.rewards = []
 
     @abc.abstractmethod
-    def sample_vector(self, frame, prev_reward):
+    def sample_vector(self, state, prev_reward):
         raise NotImplementedError
 
     def accumulate(self, rewards):
@@ -29,7 +31,9 @@ class AgentBase(abc.ABC):
 
 class ManualAgent(AgentBase):
 
-    def sample_vector(self, frame, prev_reward):
+    type = "manual"
+
+    def sample_vector(self, state, prev_reward):
         self.rewards.append(prev_reward)
         action = pygame.key.get_pressed()
         vector = np.array([0, 0])
@@ -45,6 +49,8 @@ class ManualAgent(AgentBase):
 
 
 class CleverAgent(AgentBase):
+
+    type = "clever"
 
     def __init__(self, game, speed, network):
         super().__init__(game, speed, None)
@@ -98,7 +104,50 @@ class CleverAgent(AgentBase):
 
 class SpazzAgent(AgentBase):
 
-    def sample_vector(self, frame, prev_reward):
+    type = "spazz"
+
+    def sample_vector(self, state, prev_reward):
         self.rewards.append(prev_reward)
         dvec = np.random.uniform(-self.speed, self.speed, size=2)
         return dvec.astype(int)
+
+
+class MathAgent(AgentBase):
+
+    type = "math"
+
+    def __init__(self, game, speed, network):
+        super().__init__(game, speed, network)
+
+        self.prevstate = None
+        self.prevmove = None
+        self.scared = True
+        self.velocity = np.array([0., 0.])
+        self.velocity_backup = np.array([0., 0.])
+
+    def sample_vector(self, state, prev_reward):
+        self.velocity *= 0.9
+        cstate = self.game.statistics()
+
+        mypos = cstate[:2]
+        sqpos = cstate[2:4]
+
+        denemy = cstate[4] * self.game.meandist
+
+        if denemy < self.game.meandist / 4.:
+            if denemy > self.prevstate[-1]:
+                self.velocity = -self.velocity_backup
+
+                self.scared = True
+            else:
+                self.velocity = np.array([0., 0.])
+        else:
+            if not self.scared:
+                self.velocity += np.sign(sqpos - mypos)
+            else:
+                self.velocity = self.velocity_backup
+            self.velocity_backup = np.clip(self.velocity, -self.speed, self.speed)
+            self.scared = False
+
+        self.prevstate = cstate
+        return np.clip(self.velocity, -self.speed, self.speed)
