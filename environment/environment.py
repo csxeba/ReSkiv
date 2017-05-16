@@ -131,7 +131,7 @@ class Game:
             pygame.display.flip()
 
         if not done:
-            self.agent.update(reward)
+            self.agent.update()
         self.agent.network.save()
         print("\n-- END PROGRAM --")
 
