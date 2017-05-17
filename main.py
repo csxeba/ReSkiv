@@ -67,7 +67,7 @@ downsample_by_factor = 4  # only 4-wise downsampling is supported.
 # "keras" is the Keras ANN-driven agent,
 # "spazz" is a random-moving agent,
 # "math" is the math-driven parametric agent.
-agent_type = "keras"
+agent_type = "math"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.

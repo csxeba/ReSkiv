@@ -1,6 +1,8 @@
 import abc
 
 import numpy as np
+from scipy.ndimage import distance_transform_edt as dte
+from matplotlib import pyplot as plt
 import pygame
 
 
@@ -174,10 +176,10 @@ class MathAgent(AgentBase):
         super().__init__(game, speed, network)
 
         self.prevstate = np.random.randn(5,)
-        self.velocity = np.random.randn(2)
-        self.velocity_backup = np.array([0., 0.])
+        self.velocity = np.zeros((2,))
+        self.memory = np.zeros((2,))
 
-    def sample_vector(self, state, prev_reward):
+    def sample_vector1(self, state, prev_reward):
         self.velocity *= 0.8
         cstate = self.game.statistics()
 
@@ -199,7 +201,45 @@ class MathAgent(AgentBase):
 
         self.velocity += net_movement * closing_enemy_modulator
         self.velocity = np.clip(self.velocity, -self.speed, self.speed)
-        self.velocity_backup = np.copy(self.velocity) if self.velocity.sum() else self.velocity_backup
 
         self.prevstate = cstate
         return self.velocity
+
+    def sample_vector(self, state, prev_reward):
+        ds = 2
+        state = self.game.statistics()
+        peaks = np.ones(self.game.size // ds)
+        valleys = np.ones_like(peaks)
+        for e in self.game.enemies:
+            peaks[tuple(e.coords // ds)] = 0.
+        valleys[tuple(self.game.square.coords // ds)] = 0.
+
+        scared = state[-1] / self.game.maxdist
+
+        peaks = dte(peaks)
+        peaks = 1. - peaks / self.game.maxdist
+        valleys = dte(valleys)
+        valleys = valleys / self.game.maxdist
+        hills = peaks + valleys
+
+        pc = tuple(self.game.player.coords // ds)
+
+        grad = np.gradient(hills)
+        grad = np.array([grad[0][pc], grad[1][pc]])*300
+
+        decay_v = 0.8
+        decay_m = 0.9
+
+        # self.velocity = decay_v * self.velocity + (1. - decay_v) * grad
+        # self.memory = decay_m * self.memory + (1. - decay_m) * grad**2.
+
+        self.velocity *= decay_v
+        self.velocity += grad
+
+        danger = self.game.meandist / self.game.maxdist
+        if state[-1] > danger / 2.:
+            self.velocity += np.sign(state[:2] - state[2:4])
+
+        self.velocity = np.clip(self.velocity, -self.speed, self.speed)
+
+        return -grad
