@@ -63,6 +63,13 @@ class Network:
             capsule.dump()
         return capsule
 
+    def save(self, path=None):
+        self.encapsulate("." if path is None else path)
+
+    @classmethod
+    def load(cls, path=None):
+        return cls.from_capsule("." if path is None else path)
+
     @classmethod
     def from_capsule(cls, capsule):
 

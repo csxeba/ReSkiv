@@ -16,10 +16,16 @@ def calc_meand(screensize):
     return (1/15) * ((Lw3/Lh2)+(Lh3/Lw2)+a2+a1)
 
 
-def prepro(I, ds=4):
+def downsample_image(I, ds=4):
     """Downsamples and scales an image taken from the environment"""
     I = I[::ds, ::ds, 2].astype(float) / 255.
-    return I[:, :, None].ravel()
+    return I
+
+
+def prepro_convolutional(I, ds=None):
+    I = I[::ds, ::ds, 2] if ds else I[:, :, 2]
+    I = I.astype(float) / 255.
+    return I[None, None, :, :]
 
 
 def prepro_recurrent(X):
@@ -29,7 +35,7 @@ def prepro_recurrent(X):
     Second is the batch,
     Third is the actual number of parameters
     """
-    return X[:, None, None]
+    return X[:, None, ...]  # time = batches, batches = 1
 
 
 def discount_rewards(rwd, gamma=0.99):
@@ -42,4 +48,4 @@ def discount_rewards(rwd, gamma=0.99):
         running_add = running_add * gamma + rwd[t]
         discounted_r[t] = running_add
 
-    return discounted_r[:, None]
+    return discounted_r

@@ -39,7 +39,7 @@ class GradientOptimizer(Optimizer):
 
 class SGD(GradientOptimizer):
 
-    def __init__(self, eta):
+    def __init__(self, eta=0.01):
         super().__init__()
         self.eta = eta
 

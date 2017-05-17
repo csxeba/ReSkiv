@@ -37,6 +37,8 @@ class Game:
                         (0, -1), (0, 0), (0, 1),
                         (1, -1), (1, 0), (1, 1)]
         self.labels = np.eye(len(self.actions))
+        if state not in ("statistics", "pixels"):
+            raise RuntimeError("State should be one of: [statistics, pixels]")
         self._state_str = state
         self.state = self.pixels if state == "pixels" else self.statistics
         self.data_shape = tuple(self.size) if state == "pixels" else (5,)
@@ -44,9 +46,11 @@ class Game:
                                 if reward_function is None else
                                 reward_function)
 
-    def sample_action(self, probs):
-        arg = np.random.choice(np.arange(len(self.actions)), size=1, p=probs)[0]
-        return arg, self.actions[arg], self.labels[arg]
+    def sample_action(self, prob):
+        arg = np.random.choice(np.arange(len(self.actions)), size=1, p=prob)[0]
+        actions = self.actions[arg]
+        labels = self.labels[arg]
+        return actions, labels
 
     def pixels(self):
         return pygame.surfarray.array3d(self.screen)
@@ -64,7 +68,7 @@ class Game:
             raise RuntimeError("Please instantiate and pass one of the Agents!")
         self.player = PlayerBall(*self.ballargs["player"])
         self.square = Square(*self.ballargs["square"])
-        self.enemies = [EnemyBall(*self.ballargs["enemy"])]
+        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(3)]
         self.points = 0.
         return self.step(np.array([0, 0]))[0]
 
@@ -105,15 +109,13 @@ class Game:
             if running_reward is None:
                 running_reward = reward_sum
 
-            print("\rStep count: {:>5}, Current reward: {: .3f}"
-                  .format(self.steps_taken, reward),
+            print("\rStep count: {:>5}, Current reward: {: .3f}, Current points: {:.0f}"
+                  .format(self.steps_taken, reward, self.points),
                   end="")
 
             if self.steps_taken >= max_steps or done:
                 self.episodes += 1
                 print()
-                print("\nEpisode: {} Running reward: {: .3f}"
-                      .format(self.episodes, running_reward))
                 self.agent.accumulate(reward)
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 reward_sum = 0
@@ -122,13 +124,14 @@ class Game:
                     self.reset()
                 if self.episodes % 10 == 0:
                     self.agent.update()
-                    self.episodes = 1
-                    print("Episode 1:")
+                print("\nEpisode: {} Running reward: {: .3f}"
+                      .format(self.episodes, running_reward))
 
             self.clock.tick(tock)
             pygame.display.flip()
 
         if not done:
+            print()
             self.agent.update()
         if self.agent.type == "clever":
             self.agent.network.save()
@@ -141,8 +144,8 @@ def _default_reward_function(env):
     if env.score():
         env.square = Square(*env.ballargs["square"])
         env.enemies.append(EnemyBall(*env.ballargs["enemy"]))
-        env.points += 2.
-        rwd = 10.
+        env.points += 5.
+        rwd = 9.
     if env.player.dead():
         done = 1
         rwd = -2.
