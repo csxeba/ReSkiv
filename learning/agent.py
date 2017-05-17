@@ -86,13 +86,14 @@ class CleverAgent(AgentBase):
 
         preds = self.network.prediction(Xs)
         net_cost = cross_entropy(preds, Ys) / m
-        print("{:.4f}".format(net_cost * drwds.mean()))
+        print("{: .4f}".format(net_cost * drwds.mean()))
         delta = (preds - Ys) * drwds / m
         self.network.backpropagation(delta)
         self.gradients += self.network.get_gradients()
         self.reset()
 
     def update(self):
+        print("ANN gradient update!")
         net = self.network
         update = self.optimizer.optimize(
             W=net.get_weights(),

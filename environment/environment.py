@@ -8,7 +8,7 @@ LIGHT_GREY = (100, 100, 100)
 
 class Game:
 
-    def __init__(self, fps, screensize, escape_allowed=True, state="statistics",
+    def __init__(self, fps, screensize, state="statistics",
                  playersize=10, enemysize=5, squaresize=10,
                  playercolor=DARK_GREY, enemycolor=BLUE, squarecolor=LIGHT_GREY,
                  reward_function=None):
@@ -21,9 +21,9 @@ class Game:
         }
         self.size = np.array(screensize, dtype=int)
         self.meandist = calc_meand(self.size)
+        self.maxdist = np.linalg.norm(self.size)
         self.screen = pygame.display.set_mode(self.size)
         self.clock = pygame.time.Clock()
-        self.escape_allowed = escape_allowed
         self.fps = fps
         self.agent = None
         self.player = None
@@ -54,7 +54,7 @@ class Game:
     def statistics(self):
         pcoords = self.player.coords / self.size
         scoords = self.square.coords / self.size
-        enemies = min(self.player.distance(enemy) / self.meandist
+        enemies = min(self.player.distance(enemy) / self.maxdist
                       for enemy in self.enemies)
         return np.array(list(pcoords) + list(scoords) + [enemies])
 
@@ -104,27 +104,26 @@ class Game:
             reward_sum += reward
             if running_reward is None:
                 running_reward = reward_sum
-            if self.steps_taken >= max_steps:
-                print()
-                self.agent.accumulate(reward)
-                print("Performing update!")
-                self.steps_taken = 0
-            if self.steps_taken >= max_steps*10 or done:
-                self.episodes += 1
-                running_reward = running_reward * 0.99 + reward_sum * 0.01
-                self.reset()
-                print("Episode: {} Running reward: {: .3f}"
-                      .format(self.episodes, running_reward), end="")
-                self.steps_taken = 0
-                if self.episodes % 10 == 0:
-                    print(" performing update!")
-                    self.agent.update()
-                else:
-                    print()
 
             print("\rStep count: {:>5}, Current reward: {: .3f}"
                   .format(self.steps_taken, reward),
                   end="")
+
+            if self.steps_taken >= max_steps or done:
+                self.episodes += 1
+                print()
+                print("\nEpisode: {} Running reward: {: .3f}"
+                      .format(self.episodes, running_reward))
+                self.agent.accumulate(reward)
+                running_reward = running_reward * 0.99 + reward_sum * 0.01
+                reward_sum = 0
+                self.steps_taken = 0
+                if done:
+                    self.reset()
+                if self.episodes % 10 == 0:
+                    self.agent.update()
+                    self.episodes = 1
+                    print("Episode 1:")
 
             self.clock.tick(tock)
             pygame.display.flip()
@@ -136,17 +135,17 @@ class Game:
         print("\n-- END PROGRAM --")
 
 
-def _default_reward_function(environment):
+def _default_reward_function(env):
     done = 0
-    rwd = environment.player.distance(environment.square) / (environment.meandist * 2)
-    if environment.score():
-        environment.square = Square(*environment.ballargs["square"])
-        environment.enemies.append(EnemyBall(*environment.ballargs["enemy"]))
-        environment.points += 1.
-
-    if environment.player.dead():
-        done = 1
+    rwd = 0.5 - env.player.distance(env.square) / env.maxdist
+    if env.score():
+        env.square = Square(*env.ballargs["square"])
+        env.enemies.append(EnemyBall(*env.ballargs["enemy"]))
+        env.points += 2.
         rwd = 10.
-    if environment.player.escaping():
-        rwd = -1.
+    if env.player.dead():
+        done = 1
+        rwd = -2.
+    if env.player.escaping():
+        rwd = -2.
     return rwd, done

@@ -33,9 +33,8 @@ LIGHT_GREY = (100, 100, 100)
 
 
 # Parameters of the environment
-fps = 60  # the higher, the faster the game's pace
+fps = 210  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
-boundaries_kill = False  # whether touching the game boundary kills the player
 
 # state determines what input we give to the neural net
 # can be either one of the following:
@@ -157,8 +156,7 @@ def get_agent(environment, network=None):
 
 
 def main():
-    env = Game(fps=fps, screensize=screen, escape_allowed=(not boundaries_kill),
-               state=state,
+    env = Game(fps=fps, screensize=screen, state=state,
                playersize=10, playercolor=DARK_GREY,
                enemysize=5, enemycolor=BLUE,
                squaresize=10, squarecolor=LIGHT_GREY)

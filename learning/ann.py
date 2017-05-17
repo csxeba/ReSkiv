@@ -161,7 +161,7 @@ class Network:
 
     @staticmethod
     def softmax(X):
-        eX = np.exp(X)
+        eX = np.exp(X - X.max(axis=0))
         return eX / eX.sum(axis=1, keepdims=True)
 
     @staticmethod
