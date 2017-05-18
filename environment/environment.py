@@ -66,9 +66,9 @@ class Game:
         self.agent = agent if self.agent is None else self.agent
         if self.agent is None:
             raise RuntimeError("Please instantiate and pass one of the Agents!")
-        self.player = PlayerBall(*self.ballargs["player"])
-        self.square = Square(*self.ballargs["square"])
-        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
+        self.player = PlayerBall(*self.ballargs["player"]).draw()
+        self.square = Square(*self.ballargs["square"]).draw()
+        self.enemies = [EnemyBall(*self.ballargs["enemy"]).draw() for _ in range(1)]
         self.points = 0.
         return self.step(np.array([0, 0]))[0]
 
@@ -87,6 +87,15 @@ class Game:
             e.move()
         return self.state(), reward, done
 
+    def progression(self, tock):
+        self.clock.tick(tock)
+        pygame.display.flip()
+
+    def check_quit(self):
+        if any([e.type == pygame.QUIT for e in pygame.event.get()]):
+            return True
+        return False
+
     def mainloop(self, max_steps=3000):
         self.steps_taken = 0  # a step is a single frame
         self.episodes = 1  # an episode is one game
@@ -99,7 +108,8 @@ class Game:
         print("Episode: 1")
         while 1:
             self.steps_taken += 1
-            if any([e.type == pygame.QUIT for e in pygame.event.get()]):
+
+            if self.check_quit():
                 break
 
             dvec = self.agent.sample_vector(state, reward)
@@ -127,8 +137,7 @@ class Game:
                 print("\nEpisode: {} Running reward: {: .3f}"
                       .format(self.episodes, running_reward))
 
-            self.clock.tick(tock)
-            pygame.display.flip()
+            self.progression(tock)
 
         if not done:
             print()
@@ -136,6 +145,73 @@ class Game:
         if self.agent.type == "clever":
             self.agent.network.save()
         print("\n-- END PROGRAM --")
+
+
+class Headless(Game):
+
+    def __init__(self, fps, screensize, state="statistics",
+                 playersize=10, enemysize=5, squaresize=10,
+                 playercolor=DARK_GREY, enemycolor=BLUE, squarecolor=LIGHT_GREY,
+                 reward_function=None):
+
+        self.ballargs = {
+            "player": (self, playercolor, playersize),
+            "enemy": (self, enemycolor, enemysize),
+            "square": (self, squarecolor, squaresize)
+        }
+        self.size = np.array(screensize, dtype=int)
+        self.meandist = calc_meand(self.size)
+        self.maxdist = np.linalg.norm(self.size)
+        self.agent = None
+        self.player = None
+        self.square = None
+        self.enemies = None
+        self.points = 0.
+        self.nopoints = 0
+        self.steps_taken = 0
+        self.episodes = 0
+        self.actions = [(-1, -1), (-1, 0), (-1, 1),
+                        (0, -1), (0, 0), (0, 1),
+                        (1, -1), (1, 0), (1, 1)]
+        self.labels = np.eye(len(self.actions))
+        if state != "statistics":
+            raise RuntimeError("Headless mode only supports 'statistics' state!")
+        self._state_str = state
+        self.state = self.statistics
+        self.data_shape = (5,)
+        self.reward_function = (_default_reward_function
+                                if reward_function is None else
+                                reward_function)
+
+    def pixels(self):
+        raise NotImplementedError
+
+    def reset(self, agent=None):
+        self.agent = agent if self.agent is None else self.agent
+        if self.agent is None:
+            raise RuntimeError("Please instantiate and pass one of the Agents!")
+        self.player = PlayerBall(*self.ballargs["player"])
+        self.square = Square(*self.ballargs["square"])
+        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
+        self.points = 0.
+        return self.step(np.array([0, 0]))[0]
+
+    def progression(self, tock):
+        pass
+
+    def check_quit(self):
+        pass
+
+    def step(self, dvec):
+
+        self.square.draw()
+        self.player.move(dvec)
+
+        reward, done = self.reward_function(self)
+
+        for e in self.enemies:
+            e.move()
+        return self.state(), reward, done
 
 
 def _default_reward_function(env):

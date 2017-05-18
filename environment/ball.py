@@ -14,20 +14,19 @@ class _EntityBase:
         self.size = size
         if coords is not None:
             self.teleport(coords)
-        self.draw()
-
-    def draw(self):
-        pygame.draw.circle(self.game.screen, self.color, self.coords, self.size)
 
     def adjust_coordinates(self):
         self.coords[self.coords < self.size] = self.size
         toobig = self.coords > (self.game.size - self.size)
         self.coords[toobig] = self.game.size[toobig] - self.size
 
+    def draw(self):
+        pygame.draw.circle(self.game.screen, self.color, self.coords, self.size)
+        return self
+
     def move(self, dvec):
         self.coords += dvec.astype(int)
         self.adjust_coordinates()
-        self.draw()
 
     def distance(self, other):
         return np.linalg.norm(self.coords - other.coords)
@@ -45,7 +44,6 @@ class _EntityBase:
             destination = (np.random.uniform(0.05, 0.95, 2) * self.game.size).astype(int)
         self.coords = destination
         self.adjust_coordinates()
-        self.draw()
 
 
 class EnemyBall(_EntityBase):
@@ -84,6 +82,7 @@ class Square(_EntityBase):
             self.game.screen, self.color,
             pygame.Rect(self.coords-adjust, [self.size]*2)
         )
+        return self
 
 
 class PlayerBall(_EntityBase):

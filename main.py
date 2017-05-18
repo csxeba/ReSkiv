@@ -77,7 +77,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "math" is the math-driven parametric agent.
 # "manual" is a controllable agent
 # "recorded" is a controllable agent, whose actions are recorded.
-agent_type = "math"
+agent_type = "forged"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
