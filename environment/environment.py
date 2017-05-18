@@ -68,7 +68,7 @@ class Game:
             raise RuntimeError("Please instantiate and pass one of the Agents!")
         self.player = PlayerBall(*self.ballargs["player"])
         self.square = Square(*self.ballargs["square"])
-        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(3)]
+        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
         self.points = 0.
         return self.step(np.array([0, 0]))[0]
 

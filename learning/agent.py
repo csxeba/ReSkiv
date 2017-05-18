@@ -1,13 +1,12 @@
 import abc
 
 import numpy as np
-from scipy.ndimage import distance_transform_edt as dte
-from matplotlib import pyplot as plt
 import pygame
 
 
 from utilities import (
-    discount_rewards, prepro_recurrent, prepro_convolutional
+    discount_rewards, prepro_recurrent,
+    prepro_convolutional, prepro_hills
 )
 from .optimization import Adam, cross_entropy
 
@@ -51,6 +50,24 @@ class ManualAgent(AgentBase):
         if action[pygame.K_RIGHT]:
             vector[0] += 1
         return vector * self.speed
+
+
+class RecordAgent(ManualAgent):
+
+    def __init__(self, game, speed, network):
+        super().__init__(game, speed, network)
+        self.outchain = ""
+
+    def sample_vector(self, state, prev_reward):
+        dvec = super().sample_vector(state, prev_reward)
+        self.outchain += ",".join(str(d) for d in state.ravel())
+        self.outchain += ";" + ",".join(str(d) for d in np.sign(dvec))
+        self.outchain += "\n"
+
+    def accumulate(self, rewards):
+        with open("supervised.data", "wa") as handle:
+            handle.write(self.outchain)
+        self.outchain = ""
 
 
 class CleverAgent(AgentBase):
@@ -168,6 +185,7 @@ class SpazzAgent(AgentBase):
         return dvec.astype(int)
 
 
+# noinspection PyUnusedLocal
 class MathAgent(AgentBase):
 
     type = "math"
@@ -179,7 +197,27 @@ class MathAgent(AgentBase):
         self.velocity = np.zeros((2,))
         self.memory = np.zeros((2,))
 
-    def sample_vector1(self, state, prev_reward):
+    def calculate_gradient(self, deg=1):
+
+        if deg < 1:
+            deg = 1
+
+        hills = prepro_hills(self.game)
+
+        pc = tuple(self.game.player.coords // 2)
+        px, py = pc
+
+        grads = [hills[px:px+deg, py:py+deg]]
+        i = 0
+        while i < deg:
+            grads.append(np.gradient(grads[i]))
+            i += 1
+
+        grads = [np.array([g[0].mean(), g[1].mean()]) for g in grads[1:]]
+
+        return grads[0] if deg == 1 else grads
+
+    def sample_vector_direct_vectors(self, state, prev_reward):
         self.velocity *= 0.8
         cstate = self.game.statistics()
 
@@ -205,41 +243,51 @@ class MathAgent(AgentBase):
         self.prevstate = cstate
         return self.velocity
 
-    def sample_vector(self, state, prev_reward):
-        ds = 2
+    def sample_vector_grad_raw(self, state, prev_reward):
         state = self.game.statistics()
-        peaks = np.ones(self.game.size // ds)
-        valleys = np.ones_like(peaks)
-        for e in self.game.enemies:
-            peaks[tuple(e.coords // ds)] = 0.
-        valleys[tuple(self.game.square.coords // ds)] = 0.
-
-        scared = state[-1] / self.game.maxdist
-
-        peaks = dte(peaks)
-        peaks = 1. - peaks / self.game.maxdist
-        valleys = dte(valleys)
-        valleys = valleys / self.game.maxdist
-        hills = peaks + valleys
-
-        pc = tuple(self.game.player.coords // ds)
-
-        grad = np.gradient(hills)
-        grad = np.array([grad[0][pc], grad[1][pc]])*300
-
-        decay_v = 0.8
-        decay_m = 0.9
-
-        # self.velocity = decay_v * self.velocity + (1. - decay_v) * grad
-        # self.memory = decay_m * self.memory + (1. - decay_m) * grad**2.
-
-        self.velocity *= decay_v
-        self.velocity += grad
-
         danger = self.game.meandist / self.game.maxdist
         if state[-1] > danger / 2.:
-            self.velocity += np.sign(state[:2] - state[2:4])
+            # descend on the square directly
+            return np.sign(state[2:4] - state[:2]) * self.speed
+        return -np.sign(self.calculate_gradient()) *self.speed
 
+    def sample_vector_grad_momentum(self, state, prev_reward):
+        state = self.game.statistics()
+        grad_vec = self.calculate_gradient()
+        square_vec = np.sign(state[2:4] - state[:2])
+        epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
+
+        decay_v = 0.8
+        self.velocity *= decay_v
+        danger = self.game.meandist / self.game.maxdist
+        if state[-1] > danger / 5:
+            # descend on the square directly if no enemies are close
+            self.velocity -= square_vec
+        self.velocity += 0.3*epsilon_vec + grad_vec
         self.velocity = np.clip(self.velocity, -self.speed, self.speed)
 
-        return -grad
+        return -self.velocity
+
+    def sample_vector_grad_momentum2(self, state, prev_reward):
+        state = self.game.statistics()
+        grad1, grad2 = self.calculate_gradient(2)
+        square_vec = (state[:2] - state[2:4]) / 2.
+        epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
+
+        g1coef = 0.8
+        g2coef = -(1. - g1coef)
+        edist = 1. / state[-1]**0.8
+        decay_v = 0.8
+        epsilon_factor = 0.5
+
+        self.velocity *= decay_v
+        self.velocity += (
+            epsilon_vec * epsilon_factor +
+            grad1*g1coef - grad2*(1.-g2coef) +
+            square_vec * edist * self.speed
+        )
+        self.velocity = np.clip(self.velocity, -self.speed, self.speed)
+
+        return -self.velocity
+
+    sample_vector = sample_vector_grad_momentum2
