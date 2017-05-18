@@ -20,39 +20,46 @@ are called Stochastic Policy Networks.
 Stochastic means that the network
 Policy, by the way, means the logic behind choosing an
 action.
-
 """
 
 from environment import Game
 from learning import agent
+
+#####################
+# Parameters to set #
+#####################
 
 # Some colors in RGB (0-255)
 BLUE = (0, 0, 200)
 DARK_GREY = (50, 50, 50)
 LIGHT_GREY = (100, 100, 100)
 
-
 # Parameters of the environment
 fps = 60  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
 
-# state determines what input we give to the neural net
+# State determines what input we give to the neural net
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
 state = "pixels"
 
-screen = "500x400"  # each dimension has to be divisible by 4!
-screen = tuple(map(int, screen.split("x")))
+# Because of a 4-wise downsampling, each dimension has to be divisible by 4!
+screen = "500x400"
 player_size, player_color = 10, DARK_GREY
 square_size, square_color = 10, LIGHT_GREY
 enemy_size, enemy_color = 5, BLUE
 
-# Whether to downsample the input images before convolution.
-# Only compatible when state = "pixels" and agent_is_convolutional = True!
-downsample_by_factor = 4  # only 4-wise downsampling is supported.
+# Set this to make everything bigger
+GENERAL_SCALING_FACTOR = 1
 
-# Please not two things about colors and screen size:
+player_speed, player_size, square_size, enemy_size = map(
+    lambda x: GENERAL_SCALING_FACTOR*x,
+    (player_speed, player_size, square_size, enemy_size)
+)
+screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
+
+# Please note two things about colors and screen size:
 # If you use the pixel values to teach the network,
 # the frames from the game are preprocessed.
 # - first, every frame is downsampled by a factor of 4
@@ -81,10 +88,14 @@ agent_type = "math"
 # - It's not recommended to use pooling layers in RL configurations.
 #   Stick to multiple Conv2D layers instead!
 
-agent_is_convolutional = True  # makes sure images are reshaped for convolutions
+agent_is_convolutional = False  # makes sure images are reshaped for convolutions
 agent_is_recurrent = False  # makes sure data is reshaped for recurrence
 
-# Some sanity checking here
+
+#####################
+# Sanity check here #
+#####################
+
 if state == "pixels" and not all(d % 4 == 0 for d in screen):
     msg = "Screen dimensions have to be divisible " + \
           "by 4 if pixels are used as state!"
@@ -97,9 +108,21 @@ if state == "statistics" and agent_is_convolutional:
     raise RuntimeError(msg)
 assert not all((agent_is_recurrent, agent_is_convolutional)), \
     "Choose either a Recurrent or a Convolutional architecture!"
-assert downsample_by_factor in (0, 4, None), \
-    "Only 4-wise or 0 is supported for downsampling!"
+assert isinstance(GENERAL_SCALING_FACTOR, int) and GENERAL_SCALING_FACTOR >= 1, \
+    "The GENERAL_SCALING_FACTOR should be an integer >= 1"
+if agent_type == "keras" and agent_is_recurrent:
+    msg = "Keras doesn't support variable-time recurrence." \
+          "Select a different architecture or use Brainforge!"
+    raise msg
+if agent_type == "forged" and agent_is_convolutional:
+    msg = "Convolution is unstable in brainforge." \
+          "Please consider using Keras instead!"
+    raise msg
 
+
+#######################
+# Some setup routines #
+#######################
 
 def build_ann(inshape, outshape):
     """
@@ -155,13 +178,8 @@ def keras_ann(inshape, outshape):
     from keras.layers import Conv2D, Flatten, Dense
 
     if agent_is_convolutional:
-        inshape = (1, inshape[0] // downsample_by_factor, inshape[1] // downsample_by_factor)
-    # 125 x 100 x 1 = 12 500
-    # 123 x  98 x 4 = 48 216
-    # 121 x  96 x 4 = 46 464
-    # 119 x  94 x 2 = 22 372
-    # 117 x  92 x 2 = 21 528
-    # 21 528 x 300  = 6 458 400
+        inshape = (1, inshape[0] // 4, inshape[1] // 4)
+
     model = Sequential([
         Conv2D(8, (6, 6), data_format="channels_first",
                activation="relu", input_shape=inshape),

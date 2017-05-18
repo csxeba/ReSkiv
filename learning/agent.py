@@ -197,12 +197,12 @@ class MathAgent(AgentBase):
         self.velocity = np.zeros((2,))
         self.memory = np.zeros((2,))
 
-    def calculate_gradient(self, deg=1):
+    def calculate_gradient(self, deg=1, ds=2):
 
         if deg < 1:
             deg = 1
 
-        hills = prepro_hills(self.game)
+        hills = prepro_hills(self.game, ds)
 
         pc = tuple(self.game.player.coords // 2)
         px, py = pc
@@ -249,7 +249,7 @@ class MathAgent(AgentBase):
         if state[-1] > danger / 2.:
             # descend on the square directly
             return np.sign(state[2:4] - state[:2]) * self.speed
-        return -np.sign(self.calculate_gradient()) *self.speed
+        return -np.sign(self.calculate_gradient()) * self.speed
 
     def sample_vector_grad_momentum(self, state, prev_reward):
         state = self.game.statistics()
@@ -270,7 +270,7 @@ class MathAgent(AgentBase):
 
     def sample_vector_grad_momentum2(self, state, prev_reward):
         state = self.game.statistics()
-        grad1, grad2 = self.calculate_gradient(2)
+        grad1, grad2 = self.calculate_gradient(2, ds=2)
         square_vec = (state[:2] - state[2:4]) / 2.
         epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
 

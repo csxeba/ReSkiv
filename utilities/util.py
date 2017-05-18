@@ -49,6 +49,8 @@ def prepro_recurrent(X):
 def prepro_hills(game, ds=2):
     from scipy.ndimage import distance_transform_edt as dte
 
+    ds = 1 if ds < 1 else ds
+
     sx, sy = game.size // ds
     peaks = np.ones(game.size // ds)
     peaks[(0, sx - 1, 0, sx - 1), (0, 0, sy - 1, sy - 1)] = 0.
