@@ -1,4 +1,4 @@
-from .optimizer import *
+from .optimization import *
 
 
 class _Input:
@@ -47,7 +47,7 @@ class Dense:
         return X.dot(self.W) + self.b
 
     def backpropagate(self, error):
-        l2 = self.lmbd * error.shape[0]
+        l2 = self.lmbd / error.shape[0]
         self.gW = self.gW * l2 + self.inputs.T.dot(error)
         self.gb = self.gb * l2 + error.sum(axis=0)
         return error.dot(self.W.T)
@@ -161,7 +161,7 @@ class Network:
 
     @staticmethod
     def softmax(X):
-        eX = np.exp(X)
+        eX = np.exp(X - X.max(axis=0))
         return eX / eX.sum(axis=1, keepdims=True)
 
     @staticmethod
