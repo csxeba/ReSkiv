@@ -22,8 +22,7 @@ Policy, by the way, means the logic behind choosing an
 action.
 """
 
-from environment import Game
-from learning import agent
+from environment import Game, agent
 
 #####################
 # Parameters to set #
@@ -42,7 +41,7 @@ player_speed = 7  # the higher, the faster the player
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "pixels"
+state = "statistics"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
@@ -51,6 +50,8 @@ square_size, square_color = 10, LIGHT_GREY
 enemy_size, enemy_color = 5, BLUE
 
 # Set this to make everything bigger
+# Be careful, setting to a non-integer
+# may break everything...
 GENERAL_SCALING_FACTOR = 1
 
 player_speed, player_size, square_size, enemy_size = map(
@@ -74,6 +75,8 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "keras" is the Keras ANN-driven agent,
 # "spazz" is a random-moving agent,
 # "math" is the math-driven parametric agent.
+# "manual" is a controllable agent
+# "recorded" is a controllable agent, whose actions are recorded.
 agent_type = "math"
 
 # Please set these if you intend to use one of the recurrent
@@ -108,8 +111,8 @@ if state == "statistics" and agent_is_convolutional:
     raise RuntimeError(msg)
 assert not all((agent_is_recurrent, agent_is_convolutional)), \
     "Choose either a Recurrent or a Convolutional architecture!"
-assert isinstance(GENERAL_SCALING_FACTOR, int) and GENERAL_SCALING_FACTOR >= 1, \
-    "The GENERAL_SCALING_FACTOR should be an integer >= 1"
+assert GENERAL_SCALING_FACTOR >= 1, \
+    "The GENERAL_SCALING_FACTOR should be >= 1"
 if agent_type == "keras" and agent_is_recurrent:
     msg = "Keras doesn't support variable-time recurrence." \
           "Select a different architecture or use Brainforge!"
@@ -221,9 +224,11 @@ def get_agent(env, get_network):
         "forged": agent.CleverAgent,
         "keras": agent.KerasAgent,
         "manual": agent.ManualAgent,
+        "recorded": agent.RecordAgent,
         "spazz": agent.SpazzAgent,
         "math": agent.MathAgent
-    }[agent_type](game=env, speed=player_speed, network=network)
+    }[agent_type](game=env, speed=player_speed, network=network,
+                  scale=GENERAL_SCALING_FACTOR)
     if agent_type == "clever":
         # Set the optimizer below
         actor.recurrent = agent_is_recurrent

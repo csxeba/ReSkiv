@@ -8,17 +8,18 @@ from utilities import (
     discount_rewards, prepro_recurrent,
     prepro_convolutional, prepro_hills
 )
-from .optimization import Adam, cross_entropy
+from learning.optimization import Adam, cross_entropy
 
 
 class AgentBase(abc.ABC):
 
     type = ""
 
-    def __init__(self, game, speed, network):
+    def __init__(self, game, speed, network, scale):
         self.game = game
         self.speed = speed
         self.network = network
+        self.scale = scale
         self.age = 1
         self.rewards = []
 
@@ -54,8 +55,8 @@ class ManualAgent(AgentBase):
 
 class RecordAgent(ManualAgent):
 
-    def __init__(self, game, speed, network):
-        super().__init__(game, speed, network)
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
         self.outchain = ""
 
     def sample_vector(self, state, prev_reward):
@@ -63,9 +64,10 @@ class RecordAgent(ManualAgent):
         self.outchain += ",".join(str(d) for d in state.ravel())
         self.outchain += ";" + ",".join(str(d) for d in np.sign(dvec))
         self.outchain += "\n"
+        return dvec
 
     def accumulate(self, rewards):
-        with open("supervised.data", "wa") as handle:
+        with open("supervised.data", "a") as handle:
             handle.write(self.outchain)
         self.outchain = ""
 
@@ -74,8 +76,8 @@ class CleverAgent(AgentBase):
 
     type = "clever"
 
-    def __init__(self, game, speed, network):
-        super().__init__(game, speed, network)
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
         self.Xs = []
         self.Ys = []
         self.rewards = []
@@ -134,8 +136,8 @@ class KerasAgent(AgentBase):
 
     type = "keras"
 
-    def __init__(self, game, speed, network):
-        super().__init__(game, speed, network)
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
         self.Xs = []
         self.Ys = []
         self.rewards = []
@@ -190,21 +192,23 @@ class MathAgent(AgentBase):
 
     type = "math"
 
-    def __init__(self, game, speed, network):
-        super().__init__(game, speed, network)
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
 
         self.prevstate = np.random.randn(5,)
         self.velocity = np.zeros((2,))
         self.memory = np.zeros((2,))
 
-    def calculate_gradient(self, deg=1, ds=2):
+    def calculate_gradient(self, deg=1):
 
         if deg < 1:
             deg = 1
 
-        hills = prepro_hills(self.game, ds)
+        ds = 2*self.scale
 
-        pc = tuple(self.game.player.coords // 2)
+        hills = prepro_hills(self.game, ds=ds)
+
+        pc = tuple(self.game.player.coords // ds)
         px, py = pc
 
         grads = [hills[px:px+deg, py:py+deg]]
@@ -270,13 +274,13 @@ class MathAgent(AgentBase):
 
     def sample_vector_grad_momentum2(self, state, prev_reward):
         state = self.game.statistics()
-        grad1, grad2 = self.calculate_gradient(2, ds=2)
+        grad1, grad2 = self.calculate_gradient(2)
         square_vec = (state[:2] - state[2:4]) / 2.
         epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
 
         g1coef = 0.8
         g2coef = -(1. - g1coef)
-        edist = 1. / state[-1]**0.8
+        closest_enemy_distance = 1. / state[-1]**0.8
         decay_v = 0.8
         epsilon_factor = 0.5
 
@@ -284,7 +288,7 @@ class MathAgent(AgentBase):
         self.velocity += (
             epsilon_vec * epsilon_factor +
             grad1*g1coef - grad2*(1.-g2coef) +
-            square_vec * edist * self.speed
+            square_vec * closest_enemy_distance * self.speed
         )
         self.velocity = np.clip(self.velocity, -self.speed, self.speed)
 

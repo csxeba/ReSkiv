@@ -1,7 +1,6 @@
 class Capsule:
-    def __init__(self, dirpath, name=None, cost=None,
-                 optimizer=None, architecture=None,
-                 layers=None):
+    def __init__(self, dirpath, name=None, cost=None, optimizer=None,
+                 architecture=None, layers=None):
         self.name = name
         self.cost = cost
         self.optimizer = optimizer
