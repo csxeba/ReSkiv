@@ -62,7 +62,7 @@ class RecordAgent(ManualAgent):
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
         grad1, grad2 = calculate_gradient(self.game, 2*self.scale, 2)
-        data = list(self.game.statistics()[:2]) + [grad1, grad2]
+        data = list(self.game.statistics()[:2]) + list(grad1) + list(grad2)
         self.outchain += ",".join(str(d) for d in data)
         self.outchain += ";" + ",".join(str(d) for d in np.sign(dvec))
         self.outchain += "\n"
@@ -113,6 +113,7 @@ class OnlineAgent(RecordAgent):
         self.network.set_weights(updates)
         self.gradients = np.zeros_like(self.gradients)
         self.ngrads = 0
+        self.network.save("online.agent")
 
 
 class CleverAgent(AgentBase):

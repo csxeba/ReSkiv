@@ -236,7 +236,7 @@ class Network:
         if path is None:
             path = os.getcwd()
 
-        with gzip.open("net.pgz", "wb") as handle:
+        with gzip.open("online.agent", "wb") as handle:
             pickle.dump(self, handle)
         # print("Saved ANN to", path)
         return path

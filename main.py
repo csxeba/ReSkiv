@@ -22,6 +22,7 @@ Policy, by the way, means the logic behind choosing an
 action.
 """
 
+from os.path import exists
 from environment import Game, agent
 
 #####################
@@ -58,7 +59,7 @@ player_speed, player_size, square_size, enemy_size = map(
     lambda x: GENERAL_SCALING_FACTOR*x,
     (player_speed, player_size, square_size, enemy_size)
 )
-screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
+screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))  # type: list[int]
 
 # Please note two things about colors and screen size:
 # If you use the pixel values to teach the network,
@@ -78,7 +79,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "manual" is a controllable agent
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
-agent_type = "math"
+agent_type = "online"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
@@ -122,6 +123,9 @@ if agent_type == "forged" and agent_is_convolutional:
     msg = "Convolution is unstable in brainforge." \
           "Please consider using Keras instead!"
     raise msg
+if agent_type == "online" and state != "pixels":
+    msg = "Online agent only supports 'pixels' mode!"
+    raise RuntimeError(msg)
 
 
 #######################
@@ -142,13 +146,13 @@ def build_ann(inshape, outshape):
     from learning.ann import Network, Dense, Tanh
 
     if agent_type == "online":
-        inshape = screen[0]*screen[1]
-
-    net = Network(inshape, layers=[
+        inshape = (screen[0] * screen[1]) // (16 * GENERAL_SCALING_FACTOR**2)
+    if exists("online.agent"):
+        return Network.load("online.agent")
+    return Network(inshape, layers=[
         Dense(neurons=200, lmbd=0.0), Tanh(),
         Dense(neurons=outshape, lmbd=0.0)
     ])
-    return net
 
 
 def forge_ann(inshape, outshape):
