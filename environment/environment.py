@@ -1,5 +1,5 @@
 from environment.ball import *
-from utilities.util import calc_meand
+from utilities.util import calc_meand, steep_hills
 
 BLUE = (0, 0, 200)
 DARK_GREY = (50, 50, 50)
@@ -80,11 +80,13 @@ class Game:
         self.screen.fill((0, 0, 0))
         self.square.draw()
         self.player.move(dvec)
+        self.player.draw()
 
         reward, done = self.reward_function(self)
 
         for e in self.enemies:
             e.move()
+            e.draw()
         return self.state(), reward, done
 
     def progression(self, tock):

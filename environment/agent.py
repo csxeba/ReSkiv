@@ -5,8 +5,8 @@ import pygame
 
 
 from utilities import (
-    discount_rewards, prepro_recurrent,
-    prepro_convolutional, prepro_hills
+    discount_rewards, prepro_recurrent, prepro_convolutional,
+    calculate_gradient, downsample
 )
 from learning.optimization import Adam, cross_entropy
 
@@ -61,7 +61,9 @@ class RecordAgent(ManualAgent):
 
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
-        self.outchain += ",".join(str(d) for d in state.ravel())
+        grad1, grad2 = calculate_gradient(self.game, 2*self.scale, 2)
+        data = list(self.game.statistics()[:2]) + [grad1, grad2]
+        self.outchain += ",".join(str(d) for d in data)
         self.outchain += ";" + ",".join(str(d) for d in np.sign(dvec))
         self.outchain += "\n"
         return dvec
@@ -70,6 +72,19 @@ class RecordAgent(ManualAgent):
         with open("supervised.data", "a") as handle:
             handle.write(self.outchain)
         self.outchain = ""
+
+
+class OnlineAgent(RecordAgent):
+
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
+        self.Xs = []
+        self.Ys = []
+
+    def sample_vector(self, state, prev_reward):
+        dvec = super().sample_vector(state, prev_reward)
+        self.Xs.append(downsample(self.game.pixels()).ravel())
+        self.Ys.append(dvec)
 
 
 class CleverAgent(AgentBase):
@@ -199,28 +214,6 @@ class MathAgent(AgentBase):
         self.velocity = np.zeros((2,))
         self.memory = np.zeros((2,))
 
-    def calculate_gradient(self, deg=1):
-
-        if deg < 1:
-            deg = 1
-
-        ds = 2*self.scale
-
-        hills = prepro_hills(self.game, ds=ds)
-
-        pc = tuple(self.game.player.coords // ds)
-        px, py = pc
-
-        grads = [hills[px:px+deg, py:py+deg]]
-        i = 0
-        while i < deg:
-            grads.append(np.gradient(grads[i]))
-            i += 1
-
-        grads = [np.array([g[0].mean(), g[1].mean()]) for g in grads[1:]]
-
-        return grads[0] if deg == 1 else grads
-
     def sample_vector_direct_vectors(self, state, prev_reward):
         self.velocity *= 0.8
         cstate = self.game.statistics()
@@ -253,11 +246,11 @@ class MathAgent(AgentBase):
         if state[-1] > danger / 2.:
             # descend on the square directly
             return np.sign(state[2:4] - state[:2]) * self.speed
-        return -np.sign(self.calculate_gradient()) * self.speed
+        return -np.sign(calculate_gradient(self.game, 2*self.scale, 1)) * self.speed
 
     def sample_vector_grad_momentum(self, state, prev_reward):
         state = self.game.statistics()
-        grad_vec = self.calculate_gradient()
+        grad_vec = calculate_gradient(self.game, 2*self.scale, 1)
         square_vec = np.sign(state[2:4] - state[:2])
         epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
 
@@ -274,7 +267,7 @@ class MathAgent(AgentBase):
 
     def sample_vector_grad_momentum2(self, state, prev_reward):
         state = self.game.statistics()
-        grad1, grad2 = self.calculate_gradient(2)
+        grad1, grad2 = calculate_gradient(self.game, 2*self.scale, 2)
         square_vec = (state[:2] - state[2:4]) / 2.
         epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
 

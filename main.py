@@ -34,7 +34,7 @@ DARK_GREY = (50, 50, 50)
 LIGHT_GREY = (100, 100, 100)
 
 # Parameters of the environment
-fps = 60  # the higher, the faster the game's pace
+fps = 30  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
 
 # State determines what input we give to the neural net
@@ -77,7 +77,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "math" is the math-driven parametric agent.
 # "manual" is a controllable agent
 # "recorded" is a controllable agent, whose actions are recorded.
-agent_type = "forged"
+agent_type = "recorded"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
