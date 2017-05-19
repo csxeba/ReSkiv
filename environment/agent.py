@@ -86,7 +86,7 @@ class OnlineAgent(RecordAgent):
 
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
-        self.Xs.append(downsample(self.game.pixels()).ravel())
+        self.Xs.append(downsample(state).ravel())
         self.Ys.append(self.game.labels[self.game.actions.index(tuple(dvec // self.speed))])
         return dvec
 
@@ -106,7 +106,9 @@ class OnlineAgent(RecordAgent):
         print("Online ANN accumulating {} lessons. Cost: {:.3f}".format(m, cost))
 
     def update(self):
-        print("Online ANN performing weight update...")
+        print("Online ANN weight updating!")
+        if not self.ngrads:
+            return
         updates = self.optimizer.optimize(
             self.network.get_weights(), self.gradients / self.ngrads
         )
@@ -114,6 +116,13 @@ class OnlineAgent(RecordAgent):
         self.gradients = np.zeros_like(self.gradients)
         self.ngrads = 0
         self.network.save("online.agent")
+
+
+class SavedAgent(AgentBase):
+
+    def sample_vector(self, state, prev_reward):
+        probs = self.network.prediction(downsample(state).ravel())
+        return self.game.sample_action(probs)
 
 
 class CleverAgent(AgentBase):
@@ -168,12 +177,13 @@ class CleverAgent(AgentBase):
         self.reset()
 
     def update(self):
-        sprad = np.linalg.eigvals(self.gradients).max()
-        print("ANN gradient update! Grads' spectral radius: {:.3f}".format(sprad))
+        if not self.ngrads:
+            return
+        print("ANN gradient update!")
         net = self.network
         update = self.optimizer.optimize(
             W=net.get_weights(),
-            gW=self.gradients,
+            gW=self.gradients / self.ngrads,
         )
         net.set_weights(update)
         self.gradients = np.zeros_like(self.gradients)

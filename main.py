@@ -79,7 +79,8 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x"))) 
 # "manual" is a controllable agent
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
-agent_type = "online"
+# "saved" prompts you to select a saved agent.
+agent_type = "saved"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
@@ -233,6 +234,7 @@ def get_agent(env, get_network):
         "keras": agent.KerasAgent,
         "manual": agent.ManualAgent,
         "recorded": agent.RecordAgent,
+        "saved": agent.SavedAgent,
         "online": agent.OnlineAgent,
         "spazz": agent.SpazzAgent,
         "math": agent.MathAgent
@@ -257,7 +259,8 @@ def main():
         "clever": build_ann,
         "forged": forge_ann,
         "keras": keras_ann,
-        "online": build_ann
+        "online": build_ann,
+        "saved": build_ann
     }.get(agent_type, lambda *args: None)
 
     # the "agent" variable name was already taken by the "agent" module :(
