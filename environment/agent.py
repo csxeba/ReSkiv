@@ -87,11 +87,12 @@ class OnlineAgent(RecordAgent):
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
         self.Xs.append(downsample(self.game.pixels()).ravel())
-        self.Ys.append(self.game.labels[self.game.actions.index(tuple(dvec))])
+        self.Ys.append(self.game.labels[self.game.actions.index(tuple(dvec // self.speed))])
+        return dvec
 
     def accumulate(self, rewards):
         super().accumulate(rewards)
-        X, Y = np.vstack(self.Xs)[-60:], np.vstack(self.Ys)[-60:]
+        X, Y = np.vstack(self.Xs)[:-60], np.vstack(self.Ys)[:-60]
         m = X.shape[0]
         self.Xs = []
         self.Ys = []

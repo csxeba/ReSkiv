@@ -41,7 +41,7 @@ player_speed = 7  # the higher, the faster the player
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "statistics"
+state = "pixels"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
@@ -76,8 +76,9 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "spazz" is a random-moving agent,
 # "math" is the math-driven parametric agent.
 # "manual" is a controllable agent
-# "recorded" is a controllable agent, whose actions are recorded.
-agent_type = "recorded"
+# "recorded" records your actions while you play.
+# "online" learns as YOU play and also records your actions.
+agent_type = "math"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
@@ -139,6 +140,9 @@ def build_ann(inshape, outshape):
     the output layer, because it causes overflow error.
     """
     from learning.ann import Network, Dense, Tanh
+
+    if agent_type == "online":
+        inshape = screen[0]*screen[1]
 
     net = Network(inshape, layers=[
         Dense(neurons=200, lmbd=0.0), Tanh(),
@@ -225,11 +229,12 @@ def get_agent(env, get_network):
         "keras": agent.KerasAgent,
         "manual": agent.ManualAgent,
         "recorded": agent.RecordAgent,
+        "online": agent.OnlineAgent,
         "spazz": agent.SpazzAgent,
         "math": agent.MathAgent
     }[agent_type](game=env, speed=player_speed, network=network,
                   scale=GENERAL_SCALING_FACTOR)
-    if agent_type == "clever":
+    if agent_type in ("clever", "forged", "online"):
         # Set the optimizer below
         actor.recurrent = agent_is_recurrent
         actor.optimizer = optimization.Adam()
@@ -247,10 +252,11 @@ def main():
     get_ann = {
         "clever": build_ann,
         "forged": forge_ann,
-        "keras": keras_ann
+        "keras": keras_ann,
+        "online": build_ann
     }.get(agent_type, lambda *args: None)
 
-    # the agent name was already taken by the agent module :(
+    # the "agent" variable name was already taken by the "agent" module :(
     actor = get_agent(
         env=env,
         get_network=get_ann
