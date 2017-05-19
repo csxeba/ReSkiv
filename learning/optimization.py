@@ -28,8 +28,8 @@ class RMSProp:
 
     def optimize(self, W, gW):
         self.mW = self.decay * self.mW + (1. - self.decay) * gW ** 2.
-        W -= ((self.eta * gW) / np.sqrt(self.mW + self.epsilon))
-        return W
+        update = ((self.eta * gW) / np.sqrt(self.mW + self.epsilon))
+        return W - update
 
 
 class Adam:

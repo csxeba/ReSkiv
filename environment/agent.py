@@ -78,13 +78,40 @@ class OnlineAgent(RecordAgent):
 
     def __init__(self, game, speed, network, scale):
         super().__init__(game, speed, network, scale)
+        self.gradients = np.zeros_like(network.get_gradients())
+        self.optimizer = Adam()
         self.Xs = []
         self.Ys = []
+        self.ngrads = 0
 
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
         self.Xs.append(downsample(self.game.pixels()).ravel())
-        self.Ys.append(dvec)
+        self.Ys.append(self.game.labels[self.game.actions.index(tuple(dvec))])
+
+    def accumulate(self, rewards):
+        super().accumulate(rewards)
+        X, Y = np.vstack(self.Xs)[-60:], np.vstack(self.Ys)[-60:]
+        m = X.shape[0]
+        self.Xs = []
+        self.Ys = []
+        if m < 1:
+            return
+        preds = self.network.prediction(X)
+        cost = cross_entropy(preds, Y) / m
+        self.network.backpropagation((preds - Y) / m)
+        self.gradients += self.network.get_gradients()
+        self.ngrads += 1
+        print("Online ANN accumulating {} lessons. Cost: {:.3f}".format(m, cost))
+
+    def update(self):
+        print("Online ANN performing weight update...")
+        updates = self.optimizer.optimize(
+            self.network.get_weights(), self.gradients / self.ngrads
+        )
+        self.network.set_weights(updates)
+        self.gradients = np.zeros_like(self.gradients)
+        self.ngrads = 0
 
 
 class CleverAgent(AgentBase):
@@ -97,6 +124,7 @@ class CleverAgent(AgentBase):
         self.Ys = []
         self.rewards = []
         self.gradients = np.zeros_like(network.get_gradients())
+        self.ngrads = 0
         self.optimizer = Adam()
         self.recurrent = False
 
@@ -134,17 +162,20 @@ class CleverAgent(AgentBase):
         delta = (preds - Ys) * drwds[:, None] / m
         self.network.backpropagation(delta)
         self.gradients += self.network.get_gradients()
+        self.ngrads += 1
         self.reset()
 
     def update(self):
-        print("ANN gradient update!")
+        sprad = np.linalg.eigvals(self.gradients).max()
+        print("ANN gradient update! Grads' spectral radius: {:.3f}".format(sprad))
         net = self.network
         update = self.optimizer.optimize(
             W=net.get_weights(),
-            gW=net.get_gradients(),
+            gW=self.gradients,
         )
         net.set_weights(update)
         self.gradients = np.zeros_like(self.gradients)
+        self.ngrads = 0
 
 
 class KerasAgent(AgentBase):
