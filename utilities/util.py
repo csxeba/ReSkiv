@@ -52,7 +52,7 @@ def steep_hills(game):
     hills = np.repeat(hills[..., None], 3, axis=-1)
     hills[..., 2] = 0.
     hills[..., 1] = 255. - hills[..., 0]
-    return hills
+    return hills.astype(int)
 
 
 def prepro_hills(game, ds=2):
@@ -83,7 +83,7 @@ def calculate_gradient(game, ds, deg=1):
     pc = tuple(game.player.coords // ds)
     px, py = pc
 
-    grads = [hills[px:px+deg, py:py+deg]]
+    grads = [hills[px:px+deg+1, py:py+deg+1]]
     i = 0
     while i < deg:
         grads.append(np.gradient(grads[i]))
@@ -92,7 +92,6 @@ def calculate_gradient(game, ds, deg=1):
     grads = [np.array([g[0].mean(), g[1].mean()]) for g in grads[1:]]
 
     return grads[0] if deg == 1 else grads
-
 
 
 def discount_rewards(rwd, gamma=0.99):

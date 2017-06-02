@@ -3,6 +3,8 @@ from .optimization import *
 
 class _Input:
 
+    type = "Input"
+
     def __init__(self, indim):
         self.trainable = False
         self.outdim = indim
@@ -47,6 +49,8 @@ class Trainable:
 
 class Dense(Trainable):
 
+    type = "Dense"
+
     def __init__(self, neurons, lmbd=0.01):
         self.neurons = (neurons if isinstance(neurons, int)
                         else np.prod(neurons))
@@ -80,6 +84,8 @@ class Dense(Trainable):
 
 
 class LSTM(Trainable):
+
+    type = "LSTM"
 
     def __init__(self, neurons, bias_init_factor=3.):
         self.time = 0
@@ -171,7 +177,7 @@ class LSTM(Trainable):
             dC *= f
 
             self.gb += dgates.sum(axis=0)
-            self.gW += self.Zs[t].T @ dgates
+            self.gW += np.atleast_2d(self.Zs[t]).T @ np.atleast_2d(dgates)
 
             dZ = dgates @ self.W.T
 
@@ -181,6 +187,8 @@ class LSTM(Trainable):
 
 
 class ReLU:
+
+    type = "ReLU"
 
     def __init__(self):
         self.trainable = False
@@ -202,6 +210,8 @@ class ReLU:
 
 class Sigmoid:
 
+    type = "Sigmoid"
+
     def __init__(self):
         self.trainable = False
         self.output = None
@@ -219,6 +229,8 @@ class Sigmoid:
 
 
 class Tanh:
+
+    type = "Tanh"
 
     def __init__(self):
         self.trainable = False
@@ -287,11 +299,17 @@ class Network:
             error = layer.backpropagate(error)
         return error
 
-    def epoch(self, X, Y, discount_rwds=None, bsize=50):
+    def epoch(self, X, Y, discount_rwds=None, bsize=50, shuffle=False):
         assert len(X) == len(Y)
         if bsize is None:
             bsize = len(X)
         allx = len(X)
+        if shuffle:
+            arg = np.arange(allx)
+            np.random.shuffle(arg)
+            X, Y = X[arg], Y[arg]
+            if discount_rwds is not None:
+                discount_rwds = discount_rwds[arg]
         if discount_rwds is None:
             batch_stream = ((s, X[s:s + bsize], Y[s:s + bsize]) for s in range(0, len(X), bsize))
         else:
@@ -364,3 +382,8 @@ class Network:
                 if not layer.trainable:
                     continue
                 layer.set_weights(w)
+
+    def reset_lstm(self):
+        for layer in self.layers:
+            if layer.type == "LSTM":
+                layer.C = np.zeros_like(layer.C)

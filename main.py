@@ -148,42 +148,13 @@ def build_ann(inshape, outshape):
 
     if agent_type == "online":
         inshape = (screen[0] * screen[1]) // (16 * GENERAL_SCALING_FACTOR**2)
-    if exists("online.agent"):
-        return Network.load("online.agent")
+        if exists("online.agent"):
+            return Network.load("online.agent")
     return Network(inshape, layers=[
-        LSTM(neurons=300, bias_init_factor=3.),
-        Dense(neurons=60, lmbd=0.0), Tanh(),
+        # LSTM(neurons=300, bias_init_factor=3.),
+        Dense(neurons=300, lmbd=0.0), Tanh(),
         Dense(neurons=outshape, lmbd=0.0)
     ])
-
-
-def forge_ann(inshape, outshape):
-    """
-    Use Brainforge to create an ANN.
-    Brainforge is my ANN lib. See: https://github.com/csxeba/brainforge
-    It has much more functionality than this project's "learning" submodule.
-    I include a [fairly :)] stable version in case you want to experiment
-    with more advanced architectures.
-    (And because I couldn't get Keras to work...)
-    There are some decent recurrent layer implementations like LSTM, GRU,
-    ClockworkRNN. The ConvLayer is not very stable and it's also quite slow.
-
-    A note on recurrent architectures:
-    If you use a one of the recurrent layers, you'll need to preprocess the
-    input data a bit more. This is in addition to the pixel subsampling.
-    """
-    from brainforge import Network
-    from brainforge.layers import LSTM, DenseLayer
-    brain = Network(inshape, layers=(
-        LSTM(120, activation="relu", bias_init_factor=4.),
-        DenseLayer(neurons=200, activation="tanh"),
-        DenseLayer(outshape, activation="softmax")
-    ))
-    # Attention! The implicit optimizer of the network won't be used,
-    # the agent will have its own optimizer, which is used instead!
-    # So don't set finalize()'s parameters, they won't be utilized.
-    brain.finalize(cost="xent")
-    return brain
 
 
 def keras_ann(inshape, outshape):
@@ -258,7 +229,6 @@ def main():
                squaresize=square_size, squarecolor=square_color)
     get_ann = {
         "clever": build_ann,
-        "forged": forge_ann,
         "keras": keras_ann,
         "online": build_ann,
         "saved": build_ann

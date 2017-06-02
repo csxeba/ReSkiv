@@ -78,6 +78,9 @@ class Game:
     def step(self, dvec):
 
         self.screen.fill((0, 0, 0))
+        # hills = pygame.pixelcopy.make_surface(steep_hills(self))
+        # self.screen.blit(hills, (0, 0))
+
         self.square.draw()
         self.player.move(dvec)
         self.player.draw()

@@ -3,10 +3,9 @@ import abc
 import numpy as np
 import pygame
 
-
 from utilities import (
     discount_rewards, prepro_recurrent, prepro_convolutional,
-    calculate_gradient, downsample
+    calculate_gradient, downsample, prepro_hills
 )
 from learning.optimization import Adam, cross_entropy
 
@@ -86,24 +85,36 @@ class OnlineAgent(RecordAgent):
 
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
-        self.Xs.append(downsample(state).ravel())
-        self.Ys.append(self.game.labels[self.game.actions.index(tuple(dvec // self.speed))])
+        dsX = downsample(state, 4)
+        direction = dvec // self.speed
+        self.Xs.append(dsX.ravel())
+        self.Xs.append(dsX[:, ::-1, :].ravel())
+        direction[0] *= -1
+        self.Ys.append(self.game.labels[self.game.actions.index(tuple(direction))])
+        self.Xs.append(dsX[:, :, ::-1].ravel())
+        direction *= -1
+        self.Ys.append(self.game.labels[self.game.actions.index(tuple(direction))])
         return dvec
 
-    def accumulate(self, rewards):
-        super().accumulate(rewards)
-        X, Y = np.vstack(self.Xs)[:-60], np.vstack(self.Ys)[:-60]
+    def _process_data(self, X, Y):
         m = X.shape[0]
-        self.Xs = []
-        self.Ys = []
-        if m < 1:
-            return
         preds = self.network.prediction(X)
         cost = cross_entropy(preds, Y) / m
         self.network.backpropagation((preds - Y) / m)
         self.gradients += self.network.get_gradients()
         self.ngrads += 1
         print("Online ANN accumulating {} lessons. Cost: {:.3f}".format(m, cost))
+
+    def accumulate(self, rewards):
+        super().accumulate(rewards)
+        X, Y = np.vstack(self.Xs)[:-240], np.vstack(self.Ys)[:-240]
+        self.Xs = []
+        self.Ys = []
+        if X.shape[0] < 1:
+            return
+        aY = np.copy(Y)
+        aY[:, 0] *= -1
+        self._process_data(X, Y)
 
     def update(self):
         print("Online ANN weight updating!")
@@ -121,8 +132,10 @@ class OnlineAgent(RecordAgent):
 class SavedAgent(AgentBase):
 
     def sample_vector(self, state, prev_reward):
-        probs = self.network.prediction(downsample(state).ravel())
-        return self.game.sample_action(probs)
+        X = downsample(state).ravel()[None, :]
+        probs = self.network.prediction(X)[0]
+        actn, label = self.game.sample_action(probs)
+        return np.array(actn) * self.speed
 
 
 class CleverAgent(AgentBase):
@@ -166,6 +179,8 @@ class CleverAgent(AgentBase):
         Xs = np.concatenate(self.Xs, axis=0)[nz]
         Ys = np.vstack(self.Ys)[nz]
 
+        if self.recurrent:
+            self.network.reset_lstm()
         preds = self.network.prediction(Xs)
 
         net_cost = cross_entropy(preds, Ys) / m
@@ -311,12 +326,12 @@ class MathAgent(AgentBase):
     def sample_vector_grad_momentum2(self, state, prev_reward):
         state = self.game.statistics()
         grad1, grad2 = calculate_gradient(self.game, 2*self.scale, 2)
-        square_vec = (state[:2] - state[2:4]) / 2.
+        square_vec = ((state[:2] - state[2:4]) / 2.)
         epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
 
-        g1coef = 0.8
+        g1coef = 0.2
         g2coef = -(1. - g1coef)
-        closest_enemy_distance = 1. / state[-1]**0.8
+        closest_enemy_distance = 1. / state[-1]**0.2
         decay_v = 0.8
         epsilon_factor = 0.5
 
