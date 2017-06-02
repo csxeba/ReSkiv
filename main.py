@@ -35,14 +35,14 @@ DARK_GREY = (50, 50, 50)
 LIGHT_GREY = (100, 100, 100)
 
 # Parameters of the environment
-fps = 30  # the higher, the faster the game's pace
+fps = 210  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
 
 # State determines what input we give to the neural net
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "pixels"
+state = "statistics"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
@@ -80,7 +80,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x"))) 
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
 # "saved" prompts you to select a saved agent.
-agent_type = "saved"
+agent_type = "clever"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Brainforge/Keras.
@@ -95,7 +95,7 @@ agent_type = "saved"
 #   Stick to multiple Conv2D layers instead!
 
 agent_is_convolutional = False  # makes sure images are reshaped for convolutions
-agent_is_recurrent = False  # makes sure data is reshaped for recurrence
+agent_is_recurrent = True  # makes sure data is reshaped for recurrence
 
 
 #####################
@@ -118,7 +118,7 @@ assert GENERAL_SCALING_FACTOR >= 1, \
     "The GENERAL_SCALING_FACTOR should be >= 1"
 if agent_type == "keras" and agent_is_recurrent:
     msg = "Keras doesn't support variable-time recurrence." \
-          "Select a different architecture or use Brainforge!"
+          "Build a different architecture or use Brainforge!"
     raise msg
 if agent_type == "forged" and agent_is_convolutional:
     msg = "Convolution is unstable in brainforge." \
@@ -144,14 +144,15 @@ def build_ann(inshape, outshape):
     be careful! ReLU can't be put immediately before
     the output layer, because it causes overflow error.
     """
-    from learning.ann import Network, Dense, Tanh
+    from learning.ann import Network, Dense, Tanh, LSTM
 
     if agent_type == "online":
         inshape = (screen[0] * screen[1]) // (16 * GENERAL_SCALING_FACTOR**2)
     if exists("online.agent"):
         return Network.load("online.agent")
     return Network(inshape, layers=[
-        Dense(neurons=200, lmbd=0.0), Tanh(),
+        LSTM(neurons=300, bias_init_factor=3.),
+        Dense(neurons=60, lmbd=0.0), Tanh(),
         Dense(neurons=outshape, lmbd=0.0)
     ])
 
@@ -166,22 +167,22 @@ def forge_ann(inshape, outshape):
     (And because I couldn't get Keras to work...)
     There are some decent recurrent layer implementations like LSTM, GRU,
     ClockworkRNN. The ConvLayer is not very stable and it's also quite slow.
-    
+
     A note on recurrent architectures:
     If you use a one of the recurrent layers, you'll need to preprocess the
     input data a bit more. This is in addition to the pixel subsampling.
     """
     from brainforge import Network
-    from brainforge.layers import DenseLayer
+    from brainforge.layers import LSTM, DenseLayer
     brain = Network(inshape, layers=(
+        LSTM(120, activation="relu", bias_init_factor=4.),
         DenseLayer(neurons=200, activation="tanh"),
         DenseLayer(outshape, activation="softmax")
     ))
-
     # Attention! The implicit optimizer of the network won't be used,
     # the agent will have its own optimizer, which is used instead!
     # So don't set finalize()'s parameters, they won't be utilized.
-    brain.finalize("xent")
+    brain.finalize(cost="xent")
     return brain
 
 
@@ -215,7 +216,7 @@ def get_agent(env, get_network):
     - "clever" is controlled by an Artificial Neural Network
     - "manual" can be controlled manually
     - "spazz" moves randomly around
-    
+
     If you use a clever agent, you can set its optimizer
     explicitly. Available algorithms are:
     - SGD: Stochastic Gradient Descent

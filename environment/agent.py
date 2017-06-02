@@ -145,7 +145,7 @@ class CleverAgent(AgentBase):
         self.rewards = []
 
     def sample_vector(self, state, prev_reward):
-        X = prepro_recurrent(state) if self.recurrent else state[None, :]
+        X = state[None, :]
         self.rewards.append(prev_reward)
         probs = self.network.prediction(X)[0]
         direction, label = self.game.sample_action(probs)

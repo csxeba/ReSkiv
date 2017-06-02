@@ -18,10 +18,36 @@ class _Input:
         pass
 
 
-class Dense:
+class Trainable:
+
+    trainable = True
+
+    def get_weights(self, unfold=True):
+        if unfold:
+            return np.concatenate((self.W.ravel(), self.b))
+        return [self.W, self.b]
+
+    def get_gradients(self, unfold=True):
+        if unfold:
+            return np.concatenate((self.gW.ravel(), self.gb))
+        return [self.gW, self.gb]
+
+    def set_weights(self, W, fold=True):
+        if fold:
+            wsz = self.W.size
+            self.W = W[:wsz].reshape(self.W.shape)
+            self.b = W[wsz:]
+        else:
+            self.W, self.b = W
+
+    @property
+    def nparams(self):
+        return self.W.size + self.b.size
+
+
+class Dense(Trainable):
 
     def __init__(self, neurons, lmbd=0.01):
-        self.trainable = True
         self.neurons = (neurons if isinstance(neurons, int)
                         else np.prod(neurons))
         self.lmbd = lmbd
@@ -52,27 +78,106 @@ class Dense:
         self.gb = self.gb * l2 + error.sum(axis=0)
         return error.dot(self.W.T)
 
-    def get_weights(self, unfold=True):
-        if unfold:
-            return np.concatenate((self.W.ravel(), self.b))
-        return [self.W, self.b]
 
-    def get_gradients(self, unfold=True):
-        if unfold:
-            return np.concatenate((self.gW.ravel(), self.gb))
-        return [self.gW, self.gb]
+class LSTM(Trainable):
 
-    def set_weights(self, W, fold=True):
-        if fold:
-            wsz = self.W.size
-            self.W = W[:wsz].reshape(self.W.shape)
-            self.b = W[wsz:]
-        else:
-            self.W, self.b = W
+    def __init__(self, neurons, bias_init_factor=3.):
+        self.time = 0
+        self.Z = 0
+        self.G = neurons * 3
+        self.Zs = []
+        self.gates = []
+        self.cache = []
 
-    @property
-    def nparams(self):
-        return self.W.size + self.b.size
+        self.s = Sigmoid()
+        self.r = ReLU()
+
+        self.neurons = neurons
+        self.outdim = neurons
+        self.bias_init_factor = bias_init_factor
+
+        self.inputs = None
+
+        self.W = None
+        self.b = None
+        self.gW = None
+        self.gb = None
+        self.C = np.zeros((self.neurons,))
+
+    def connect(self, layer):
+        inshape = layer.outdim
+        self.Z = inshape[-1] + self.neurons
+        self.W = np.random.randn(self.Z, self.neurons * 4) / self.Z
+        self.b = np.zeros((self.neurons * 4,)) + self.bias_init_factor
+        self.gW = np.zeros_like(self.W)
+        self.gb = np.zeros_like(self.b)
+
+    def feedforward(self, X):
+        time, dim = X.shape
+        self.time = time
+        self.inputs = X
+        self.Zs, self.gates, self.cache = [], [], []
+        output = np.zeros((self.neurons,))
+
+        for t in range(time):
+            Z = np.concatenate((self.inputs[t], output))
+
+            preact = Z @ self.W + self.b  # type: np.ndarray
+            preact[:self.G] = self.s.feedforward(preact[:self.G])
+            preact[self.G:] = self.r.feedforward(preact[self.G:])
+
+            f, i, o, cand = np.split(preact, 4, axis=-1)
+
+            self.C = self.C * f + i * cand
+            output = self.C * o
+
+            self.Zs.append(Z)
+            self.gates.append(preact)
+            self.cache.append([output, self.C.copy(), preact])
+
+        return np.stack([cache[0] for cache in self.cache], axis=0)
+
+    def backpropagate(self, error):
+        self.gW = np.zeros_like(self.W)
+        self.gb = np.zeros_like(self.b)
+        delta = error
+
+        actprime = self.r.backpropagate
+        sigprime = self.s.backpropagate
+
+        dC = np.zeros_like(delta[-1])
+        dX = np.zeros_like(self.inputs)
+        dZ = np.zeros_like(self.Zs[0])
+
+        for t in range(-1, -(self.time+1), -1):
+            output, state, preact = self.cache[t]
+            f, i, o, cand = np.split(self.gates[t], 4, axis=-1)
+
+            # Add recurrent delta to output delta
+            delta[t] += dZ[-self.neurons:]
+
+            # Backprop into state
+            dC += delta[t] * o * state
+
+            state_yesterday = 0. if t == -self.time else self.cache[t-1][1]
+            # Calculate the gate derivatives
+            df = state_yesterday * dC
+            di = cand * dC
+            do = state * delta[t]
+            dcand = i * dC * actprime(cand)  # Backprop nonlinearity
+            dgates = np.concatenate((df, di, do, dcand), axis=-1)
+            dgates[:self.G] *= sigprime(self.gates[t][:self.G])  # Backprop nonlinearity
+
+            dC *= f
+
+            self.gb += dgates.sum(axis=0)
+            self.gW += self.Zs[t].T @ dgates
+
+            dZ = dgates @ self.W.T
+
+            dX[t] = dZ[:-self.neurons]
+
+        return dX
 
 
 class ReLU:
@@ -163,10 +268,6 @@ class Network:
     def softmax(X):
         eX = np.exp(X - X.max(axis=0))
         return eX / eX.sum(axis=1, keepdims=True)
-
-    @staticmethod
-    def sigmoid(X):
-        return 1. / (1. + np.exp(-X))
 
     @classmethod
     def default(cls, inshape, outshape, lmbd_global=0.):
