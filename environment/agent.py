@@ -260,6 +260,22 @@ class SpazzAgent(AgentBase):
         return dvec.astype(int)
 
 
+class QAgent(AgentBase):
+
+    def __init__(self, game, speed, network, scale):
+        super().__init__(game, speed, network, scale)
+        self.memory = []
+        self.recurrent = False
+
+    def reset(self):
+        self.memory = []
+
+    def sample_vector(self, state, prev_reward):
+        self.memory.append(state)
+        Q = self.network.prediction(state[-1])[0]
+        action = self.game.sample_action(Q)
+
+
 # noinspection PyUnusedLocal
 class MathAgent(AgentBase):
 

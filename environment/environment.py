@@ -34,8 +34,8 @@ class Game:
         self.steps_taken = 0
         self.episodes = 0
         self.actions = [(-1, -1), (-1, 0), (-1, 1),
-                        (0, -1), (0, 0), (0, 1),
-                        (1, -1), (1, 0), (1, 1)]
+                        ( 0, -1), ( 0, 0), ( 0, 1),
+                        (+1, -1), (+1, 0), (+1, 1)]
         self.labels = np.eye(len(self.actions))
         if state not in ("statistics", "pixels"):
             raise RuntimeError("State should be one of: [statistics, pixels]")
@@ -45,6 +45,7 @@ class Game:
         self.reward_function = (_default_reward_function
                                 if reward_function is None else
                                 reward_function)
+        self.yesterday = None
 
     def sample_action(self, prob):
         arg = np.random.choice(np.arange(len(self.actions)), size=1, p=prob)[0]

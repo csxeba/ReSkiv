@@ -42,7 +42,7 @@ player_speed = 7  # the higher, the faster the player
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "statistics"
+state = "pixels"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
