@@ -264,16 +264,50 @@ class QAgent(AgentBase):
 
     def __init__(self, game, speed, network, scale):
         super().__init__(game, speed, network, scale)
+        self.S = []
+        self.Qs = []
+        self.R = []
+        self.A = []
+        self.X = np.zeros([1] + game.size)
+        self.Y = np.zeros((1, len(game.actions)))
+
         self.memory = []
+        self.epsilon = 0.1
         self.recurrent = False
 
     def reset(self):
-        self.memory = []
+        self.S, self.A, self.R = [[] for _ in range(3)]
 
     def sample_vector(self, state, prev_reward):
-        self.memory.append(state)
-        Q = self.network.prediction(state[-1])[0]
-        action = self.game.sample_action(Q)
+        self.S.append(state)
+        self.R.append(prev_reward)
+        Q = self.network.prediction(state[None, ...])[0]
+        self.Qs.append(Q)
+        ix = np.argmax(Q) if np.random.uniform() < self.epsilon else np.random.randint(0, len(Q))
+        self.A.append(ix)
+        return self.game.actions(ix)
+
+    def accumulate(self, rewards):
+        S = np.vstack(self.S)
+        R = discount_rewards(np.vstack(self.R[1:]))
+        S = S[:-1]
+        Y = np.vstack(self.Qs[:-1])
+        Y[-1, self.A[-1]] = rewards
+        Y[:-1, tuple(self.A[1:])] = R +
+        self.X = np.hstack((self.X, S))
+        self.Y = np.hstack((self.Y, Y))
+
+    def update(self):
+        N = len(self.X)
+        if N < 4000:
+            return
+        arg = np.arange(N)
+        np.random.shuffle(arg)
+        arg = arg[:2000]
+        self.network.fit(self.X[arg], self.Y[arg])
+        if N > 120000:
+            self.X = self.X[-8000:]
+            self.Y = self.Y[-8000:]
 
 
 # noinspection PyUnusedLocal
