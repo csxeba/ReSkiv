@@ -144,7 +144,7 @@ class Game:
                 self.steps_taken = 0
                 if done:
                     self.reset()
-                if self.episodes % 10 == 0:
+                if self.episodes % 5 == 0:
                     self.agent.update()
                 print("\nEpisode: {} Running reward: {: .3f}"
                       .format(self.episodes, running_reward))

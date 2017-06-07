@@ -1,3 +1,5 @@
+import abc
+
 import numpy as np
 
 
@@ -13,7 +15,14 @@ def mean_squared_error(A, Y):
     return -np.sum((A - Y)**2)
 
 
-class SGD:
+class Optimizer(abc.ABC):
+
+    @abc.abstractmethod
+    def optimize(self, W, gW):
+        raise NotImplementedError
+
+
+class SGD(Optimizer):
 
     def __init__(self, eta=0.01):
         self.eta = eta
@@ -22,7 +31,7 @@ class SGD:
         return W - gW * self.eta
 
 
-class RMSProp:
+class RMSProp(Optimizer):
 
     def __init__(self, eta=0.1, decay=0.9, epsilon=1e-8):
         self.eta = eta
@@ -36,7 +45,7 @@ class RMSProp:
         return W - update
 
 
-class Adam:
+class Adam(Optimizer):
 
     def __init__(self, eta=0.1, decay_memory=0.9, decay_velocity=0.999, epsilon=1e-8):
         self.eta = eta

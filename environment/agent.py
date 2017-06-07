@@ -264,6 +264,7 @@ class QAgent(AgentBase):
     type = "q"
 
     def __init__(self, game, speed, network, scale):
+        assert network is not None
         super().__init__(game, speed, network, scale)
         self.S = []
         self.Qs = []
@@ -271,14 +272,13 @@ class QAgent(AgentBase):
         self.A = []
         self.X = np.zeros([1, np.prod(game.data_shape)])
         self.Y = np.zeros((1, len(game.actions)))
-        self.T = []
 
         self.memory = []
         self.epsilon = 0.1
         self.recurrent = False
 
     def reset(self):
-        self.S, self.A, self.R = [[] for _ in range(3)]
+        self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
 
     def sample_vector(self, state, prev_reward):
         S = state.ravel()
@@ -301,18 +301,22 @@ class QAgent(AgentBase):
         Y[:, ixs] = R + rwds
         self.X = np.concatenate((self.X, X))
         self.Y = np.concatenate((self.Y, Y))
+        if len(X) > 24000:
+            arg = np.arange(len(self.X))
+            np.random.shuffle(arg)
+            arg = arg[-12000:]
+            self.X = self.X[arg]
+            self.Y = self.Y[arg]
+        self.reset()
 
     def update(self):
         N = len(self.X)
-        if N < 4000:
+        if N < 12000:
             return
         arg = np.arange(N)
         np.random.shuffle(arg)
-        arg = arg[:2000]
-        self.network.fit(self.X[arg], self.Y[arg])
-        if N > 120000:
-            self.X = self.X[-8000:]
-            self.Y = self.Y[-8000:]
+        arg = arg[:12000]
+        self.network.epoch(self.X[arg], self.Y[arg], bsize=100)
 
 
 # noinspection PyUnusedLocal

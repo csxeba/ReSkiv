@@ -20,6 +20,7 @@ class _Input:
         pass
 
 
+# noinspection PyUnresolvedReferences
 class Trainable:
 
     trainable = True
@@ -40,11 +41,24 @@ class Trainable:
             self.W = W[:wsz].reshape(self.W.shape)
             self.b = W[wsz:]
         else:
+            # noinspection PyAttributeOutsideInit
             self.W, self.b = W
 
     @property
     def nparams(self):
         return self.W.size + self.b.size
+
+
+class Activation:
+
+    trainable = False
+
+    def __init__(self):
+        self.outdim = None
+        self.cache = None
+
+    def connect(self, layer):
+        self.outdim = layer.outdim
 
 
 class Dense(Trainable):
@@ -186,84 +200,70 @@ class LSTM(Trainable):
         return dX
 
 
-class ReLU:
+class ReLU(Activation):
 
     type = "ReLU"
 
-    def __init__(self):
-        self.trainable = False
-        self.outdim = None
-        self.mask = None
-
-    def connect(self, layer):
-        self.outdim = layer.outdim
-
     def feedforward(self, X):
-        self.mask = X < 0.
-        X[self.mask] = 0.
+        self.cache = X < 0.
+        X[self.cache] = 0.
         return X
 
     def backpropagate(self, error):
-        error[self.mask] = 0.
+        error[self.cache] = 0.
         return error
 
 
-class Sigmoid:
+class Sigmoid(Activation):
 
     type = "Sigmoid"
 
-    def __init__(self):
-        self.trainable = False
-        self.output = None
-        self.outdim = None
-
-    def connect(self, layer):
-        self.outdim = layer.outdim
-
     def feedforward(self, X):
-        self.output = 1. / (1. + np.exp(-X))
-        return self.output
+        self.cache = 1. / (1. + np.exp(-X))
+        return self.cache
 
     def backpropagate(self, error):
-        return error * self.output * (1. - self.output)
+        return error * self.cache * (1. - self.cache)
 
 
-class Tanh:
+class Tanh(Activation):
 
     type = "Tanh"
 
-    def __init__(self):
-        self.trainable = False
-        self.output = None
-        self.outdim = None
-
-    def connect(self, layer):
-        self.outdim = layer.outdim
-
     def feedforward(self, X):
-        self.output = np.tanh(X)
-        return self.output
+        self.cache = np.tanh(X)
+        return self.cache
 
     def backpropagate(self, error):
-        return error * (1. - self.output**2)
+        return error * (1. - self.cache**2)
+
+
+class Softmax(Activation):
+
+    @staticmethod
+    def feedforward(X):
+        eX = np.exp(X)
+        return eX / eX.sum(axis=1, keepdims=True)
+
+    @staticmethod
+    def backpropagate(error):
+        return 1.
 
 
 class Network:
 
     def __init__(self, inshape, layers=(), optimizer="rmsprop"):
         self.layers = []
-        self.memory = []  # RMSprop memory
         self.layers.append(_Input(inshape))
         for layer in layers:
             layer.connect(self.layers[-1])
             self.layers.append(layer)
-            if layer.trainable:
-                self.memory.append((np.zeros_like(layer.W), np.zeros_like(layer.b)))
-        self.cost = cross_entropy
-        if isinstance(optimizer, str):
-            self.optimizer = {"sgd": SGD(),
-                              "adam": Adam(),
-                              "rmsprop": RMSProp()}
+        self.cost = (cross_entropy if isinstance(self.layers[-1], Softmax)
+                     else mean_squared_error)
+        if not isinstance(optimizer, Optimizer):
+            self.optimizer = {
+                "sgd": SGD(), "adam": Adam(),
+                "rmsprop": RMSProp()}[optimizer]
         else:
             self.optimizer = optimizer
 
@@ -289,9 +289,11 @@ class Network:
             Dense(outshape, lmbd=lmbd_global)
         ))
 
-    def prediction(self, X):
+    def feedforward(self, X):
         for layer in self.layers:
             X = layer.feedforward(X)
+
+    def prediction(self, X):
         return self.softmax(X)
 
     def backpropagation(self, error):
