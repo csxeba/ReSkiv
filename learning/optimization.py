@@ -9,6 +9,10 @@ def cross_entropy2(A: np.ndarray, Y: np.ndarray):
     return -np.sum(Y * np.log(A) + (1. - Y) * np.log(1. - A))
 
 
+def mean_squared_error(A, Y):
+    return -np.sum((A - Y)**2)
+
+
 class SGD:
 
     def __init__(self, eta=0.01):

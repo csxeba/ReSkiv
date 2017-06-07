@@ -5,7 +5,7 @@ import pygame
 
 from utilities import (
     discount_rewards, prepro_recurrent, prepro_convolutional,
-    calculate_gradient, downsample, prepro_hills
+    calculate_gradient
 )
 from learning.optimization import Adam, cross_entropy
 
@@ -85,13 +85,12 @@ class OnlineAgent(RecordAgent):
 
     def sample_vector(self, state, prev_reward):
         dvec = super().sample_vector(state, prev_reward)
-        dsX = downsample(state, 4)
         direction = dvec // self.speed
-        self.Xs.append(dsX.ravel())
-        self.Xs.append(dsX[:, ::-1, :].ravel())
+        self.Xs.append(state.ravel())
+        self.Xs.append(state[:, ::-1, :].ravel())
         direction[0] *= -1
         self.Ys.append(self.game.labels[self.game.actions.index(tuple(direction))])
-        self.Xs.append(dsX[:, :, ::-1].ravel())
+        self.Xs.append(state[:, :, ::-1].ravel())
         direction *= -1
         self.Ys.append(self.game.labels[self.game.actions.index(tuple(direction))])
         return dvec
@@ -132,7 +131,7 @@ class OnlineAgent(RecordAgent):
 class SavedAgent(AgentBase):
 
     def sample_vector(self, state, prev_reward):
-        X = downsample(state).ravel()[None, :]
+        X = state.ravel()[None, :]
         probs = self.network.prediction(X)[0]
         actn, label = self.game.sample_action(probs)
         return np.array(actn) * self.speed
@@ -262,14 +261,17 @@ class SpazzAgent(AgentBase):
 
 class QAgent(AgentBase):
 
+    type = "q"
+
     def __init__(self, game, speed, network, scale):
         super().__init__(game, speed, network, scale)
         self.S = []
         self.Qs = []
         self.R = []
         self.A = []
-        self.X = np.zeros([1] + game.size)
+        self.X = np.zeros([1, np.prod(game.data_shape)])
         self.Y = np.zeros((1, len(game.actions)))
+        self.T = []
 
         self.memory = []
         self.epsilon = 0.1
@@ -279,23 +281,26 @@ class QAgent(AgentBase):
         self.S, self.A, self.R = [[] for _ in range(3)]
 
     def sample_vector(self, state, prev_reward):
-        self.S.append(state)
+        S = state.ravel()
+        self.S.append(S)
         self.R.append(prev_reward)
-        Q = self.network.prediction(state[None, ...])[0]
+        Q = self.network.prediction(S[None, ...])[0]
         self.Qs.append(Q)
         ix = np.argmax(Q) if np.random.uniform() < self.epsilon else np.random.randint(0, len(Q))
         self.A.append(ix)
-        return self.game.actions(ix)
+        return np.array(self.game.actions[ix]) * self.speed
 
     def accumulate(self, rewards):
-        S = np.vstack(self.S)
-        R = discount_rewards(np.vstack(self.R[1:]))
-        S = S[:-1]
+        X = np.vstack(self.S)
+        X = X[:-1]
+        R = discount_rewards(np.array(self.R[1:]))
         Y = np.vstack(self.Qs[:-1])
+        ixs = tuple(self.A[1:])
         Y[-1, self.A[-1]] = rewards
-        Y[:-1, tuple(self.A[1:])] = R +
-        self.X = np.hstack((self.X, S))
-        self.Y = np.hstack((self.Y, Y))
+        rwds = R + Y.max(axis=1)
+        Y[:, ixs] = R + rwds
+        self.X = np.concatenate((self.X, X))
+        self.Y = np.concatenate((self.Y, Y))
 
     def update(self):
         N = len(self.X)

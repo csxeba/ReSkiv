@@ -72,7 +72,6 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x"))) 
 
 # Can be one of [clever, forged, keras, manual, spazz, math]
 # Where "clever" is the builtin ANN-driven agent,
-# "forged" is the Brainforged ANN-driven agent,
 # "keras" is the Keras ANN-driven agent,
 # "spazz" is a random-moving agent,
 # "math" is the math-driven parametric agent.
@@ -80,22 +79,22 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x"))) 
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
 # "saved" prompts you to select a saved agent.
-agent_type = "clever"
+agent_type = "q"
 
 # Please set these if you intend to use one of the recurrent
-# or convolutional layer architectures in Brainforge/Keras.
+# or convolutional layer architectures in Keras.
 # Some recurrent layers worth mentioning:
 # - LSTM: recurrence with internal memory cells
 # - GRU: similar to LSTM, but a more recent architecture
 # - ClockworkRNN: similar to RLayer, but faster and better
 # Some notes on convolutional architectures:
 # - Please use the keras_ann() function to construct convolutional
-#   networks! Brainforge's ConvLayer is unstable and slow.
+#   networks!
 # - It's not recommended to use pooling layers in RL configurations.
 #   Stick to multiple Conv2D layers instead!
 
 agent_is_convolutional = False  # makes sure images are reshaped for convolutions
-agent_is_recurrent = True  # makes sure data is reshaped for recurrence
+agent_is_recurrent = False  # makes sure data is reshaped for recurrence
 
 
 #####################
@@ -120,10 +119,6 @@ if agent_type == "keras" and agent_is_recurrent:
     msg = "Keras doesn't support variable-time recurrence." \
           "Build a different architecture or use Brainforge!"
     raise msg
-if agent_type == "forged" and agent_is_convolutional:
-    msg = "Convolution is unstable in brainforge." \
-          "Please consider using Keras instead!"
-    raise msg
 if agent_type == "online" and state != "pixels":
     msg = "Online agent only supports 'pixels' mode!"
     raise RuntimeError(msg)
@@ -144,17 +139,19 @@ def build_ann(inshape, outshape):
     be careful! ReLU can't be put immediately before
     the output layer, because it causes overflow error.
     """
-    from learning.ann import Network, Dense, Tanh, LSTM
+    from learning.ann import Network, Dense, Tanh
 
     if agent_type == "online":
         inshape = (screen[0] * screen[1]) // (16 * GENERAL_SCALING_FACTOR**2)
         if exists("online.agent"):
             return Network.load("online.agent")
-    return Network(inshape, layers=[
-        # LSTM(neurons=300, bias_init_factor=3.),
+    net = Network(inshape, layers=[
         Dense(neurons=300, lmbd=0.0), Tanh(),
         Dense(neurons=outshape, lmbd=0.0)
     ])
+    if agent_type == "q":
+        net.learn_batch = net.learn_regressor
+    return net
 
 
 def keras_ann(inshape, outshape):
@@ -162,22 +159,21 @@ def keras_ann(inshape, outshape):
     from keras.layers import Conv2D, Flatten, Dense
 
     if agent_is_convolutional:
-        inshape = (1, inshape[0] // 4, inshape[1] // 4)
+        inshape = (1, inshape[0] // 2, inshape[1] // 2)
+
+    outact = "linear" if agent_type == "q" else "softmax"
+    cost = "mse" if agent_type == "q" else "categorical_crossentropy"
 
     model = Sequential([
-        Conv2D(8, (6, 6), data_format="channels_first",
-               activation="relu", input_shape=inshape),
-        Conv2D(6, (3, 3), data_format="channels_first",
-               activation="relu"),
-        Conv2D(4, (3, 3), data_format="channels_first",
-               activation="relu"),
-        Conv2D(2, (3, 3), data_format="channels_first",
-               activation="relu"),
+        Conv2D(8, (6, 6), activation="relu", input_shape=inshape),
+        Conv2D(6, (3, 3), activation="relu"),
+        Conv2D(4, (3, 3), activation="relu"),
+        Conv2D(2, (3, 3), activation="relu"),
         Flatten(),
         Dense(120, activation="tanh"),
-        Dense(outshape, activation="softmax")
+        Dense(outshape, activation=outact)
     ])
-    model.compile(optimizer="adam", loss="categorical_crossentropy")
+    model.compile(optimizer="adam", loss=cost)
     return model
 
 
@@ -202,13 +198,13 @@ def get_agent(env, get_network):
     network = get_network(env.data_shape, len(env.actions))
     actor = {
         "clever": agent.CleverAgent,
-        "forged": agent.CleverAgent,
         "keras": agent.KerasAgent,
         "manual": agent.ManualAgent,
         "recorded": agent.RecordAgent,
         "saved": agent.SavedAgent,
         "online": agent.OnlineAgent,
         "spazz": agent.SpazzAgent,
+        "q": agent.QAgent,
         "math": agent.MathAgent
     }[agent_type](game=env, speed=player_speed, network=network,
                   scale=GENERAL_SCALING_FACTOR)
@@ -231,7 +227,8 @@ def main():
         "clever": build_ann,
         "keras": keras_ann,
         "online": build_ann,
-        "saved": build_ann
+        "saved": build_ann,
+        "q": build_ann
     }.get(agent_type, lambda *args: None)
 
     # the "agent" variable name was already taken by the "agent" module :(

@@ -327,7 +327,7 @@ class Network:
         print("\rANN Fitting... {:>.2%} Cost: {:>.4f}"
               .format(1., np.mean(costs)))
 
-    def learn_batch(self, X, Y, discount_rwds=None):
+    def learn_classifier(self, X, Y, discount_rwds=None):
         predictions = self.prediction(X)
         cost = cross_entropy(predictions, Y)
         network_delta = predictions - Y
@@ -336,6 +336,16 @@ class Network:
         self.backpropagation(network_delta)
         self.set_weights(self.optimizer.optimize(self.get_weights(), self.get_gradients()))
         return cost
+
+    def learn_regressor(self, X, Y, discount_rwds=None):
+        predictions = self.prediction(X)
+        cost = mean_squared_error(predictions, Y)
+        network_delta = predictions - Y
+        self.backpropagation(network_delta)
+        self.set_weights(self.optimizer.optimize(self.get_weights(), self.get_gradients()))
+        return cost
+
+    learn_batch = learn_classifier
 
     def evaluate(self, X, Y):
         pred = self.prediction(X)

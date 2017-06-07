@@ -1,5 +1,5 @@
 from environment.ball import *
-from utilities.util import calc_meand, steep_hills
+from utilities.util import calc_meand, downsample
 
 BLUE = (0, 0, 200)
 DARK_GREY = (50, 50, 50)
@@ -11,7 +11,7 @@ class Game:
     def __init__(self, fps, screensize, state="statistics",
                  playersize=10, enemysize=5, squaresize=10,
                  playercolor=DARK_GREY, enemycolor=BLUE, squarecolor=LIGHT_GREY,
-                 reward_function=None):
+                 reward_function=None, downsmpl=True):
 
         pygame.init()
         self.ballargs = {
@@ -41,11 +41,14 @@ class Game:
             raise RuntimeError("State should be one of: [statistics, pixels]")
         self._state_str = state
         self.state = self.pixels if state == "pixels" else self.statistics
-        self.data_shape = tuple(self.size) if state == "pixels" else (5,)
-        self.reward_function = (_default_reward_function
-                                if reward_function is None else
-                                reward_function)
-        self.yesterday = None
+        self.data_shape = (
+            tuple(self.size // (4 if downsmpl else 1))
+            if state == "pixels" else (5,)
+        )
+        self.reward_function = (
+            _default_reward_function if reward_function is None else reward_function
+        )
+        self.downsample = downsmpl
 
     def sample_action(self, prob):
         arg = np.random.choice(np.arange(len(self.actions)), size=1, p=prob)[0]
@@ -54,7 +57,10 @@ class Game:
         return actions, labels
 
     def pixels(self):
-        return pygame.surfarray.array3d(self.screen)
+        state = pygame.surfarray.array3d(self.screen)
+        if self.downsample:
+            state = downsample(state)
+        return state
 
     def statistics(self):
         pcoords = self.player.coords / self.size
@@ -118,8 +124,8 @@ class Game:
             if self.check_quit():
                 break
 
-            dvec = self.agent.sample_vector(state, reward)
-            state, reward, done = self.step(dvec)
+            action = self.agent.sample_vector(state, reward)
+            state, reward, done = self.step(action)
 
             reward_sum += reward
             if running_reward is None:
