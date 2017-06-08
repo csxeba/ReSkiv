@@ -19,7 +19,7 @@ def calc_meand(screensize):
 
 def downsample(I, ds=4):
     """Downsamples and scales an image taken from the environment"""
-    return I[::ds, ::ds, 2] / 255.
+    return I[None, ::ds, ::ds, 2] / 255.
 
 
 def prepro_convolutional(I, ds=None):

@@ -7,6 +7,7 @@ from utilities import (
     discount_rewards, prepro_recurrent, prepro_convolutional,
     calculate_gradient
 )
+from learning.experience import Experience
 from learning.optimization import Adam, cross_entropy
 
 
@@ -137,7 +138,7 @@ class SavedAgent(AgentBase):
         return np.array(actn) * self.speed
 
 
-class CleverAgent(AgentBase):
+class PolicyLearningAgent(AgentBase):
 
     type = "clever"
 
@@ -204,6 +205,53 @@ class CleverAgent(AgentBase):
         self.ngrads = 0
 
 
+class QLearningAgent(AgentBase):
+
+    type = "q"
+
+    def __init__(self, game, speed, network, scale):
+        assert network is not None
+        super().__init__(game, speed, network, scale)
+        self.S = []
+        self.Qs = []
+        self.R = []
+        self.A = []
+        self.xp = Experience()
+
+        self.epsilon = 0.1
+        self.recurrent = False
+
+    def reset(self):
+        self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
+
+    def sample_vector(self, state, prev_reward):
+        S = state.ravel()
+        self.S.append(S)
+        self.R.append(prev_reward)
+        Q = self.network.predict(S[None, ...])[0]
+        self.Qs.append(Q)
+        ix = (np.argmax(Q) if np.random.uniform() < self.epsilon
+              else np.random.randint(0, len(Q)))
+        self.A.append(ix)
+        return np.array(self.game.actions[ix]) * self.speed
+
+    def accumulate(self, rewards):
+        X = np.vstack(self.S)
+        X = X[:-1]
+        R = discount_rewards(np.array(self.R[1:]))
+        Y = np.vstack(self.Qs[:-1])
+        ixs = tuple(self.A[1:])
+        Y[-1, self.A[-1]] = rewards
+        rwd = R + Y.max(axis=1)
+        Y[:, ixs] = rwd
+        self.xp.accumulate(X, Y)
+        self.reset()
+
+    def update(self):
+        X, Y = self.xp.get_batch(5000)
+        self.network.fit(X, Y, epochs=1, batch_size=300)
+
+
 class KerasAgent(AgentBase):
 
     type = "keras"
@@ -257,66 +305,6 @@ class SpazzAgent(AgentBase):
         self.rewards.append(prev_reward)
         dvec = np.random.uniform(-self.speed, self.speed, size=2)
         return dvec.astype(int)
-
-
-class QAgent(AgentBase):
-
-    type = "q"
-
-    def __init__(self, game, speed, network, scale):
-        assert network is not None
-        super().__init__(game, speed, network, scale)
-        self.S = []
-        self.Qs = []
-        self.R = []
-        self.A = []
-        self.X = np.zeros([1, np.prod(game.data_shape)])
-        self.Y = np.zeros((1, len(game.actions)))
-
-        self.memory = []
-        self.epsilon = 0.1
-        self.recurrent = False
-
-    def reset(self):
-        self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
-
-    def sample_vector(self, state, prev_reward):
-        S = state.ravel()
-        self.S.append(S)
-        self.R.append(prev_reward)
-        Q = self.network.prediction(S[None, ...])[0]
-        self.Qs.append(Q)
-        ix = np.argmax(Q) if np.random.uniform() < self.epsilon else np.random.randint(0, len(Q))
-        self.A.append(ix)
-        return np.array(self.game.actions[ix]) * self.speed
-
-    def accumulate(self, rewards):
-        X = np.vstack(self.S)
-        X = X[:-1]
-        R = discount_rewards(np.array(self.R[1:]))
-        Y = np.vstack(self.Qs[:-1])
-        ixs = tuple(self.A[1:])
-        Y[-1, self.A[-1]] = rewards
-        rwds = R + Y.max(axis=1)
-        Y[:, ixs] = R + rwds
-        self.X = np.concatenate((self.X, X))
-        self.Y = np.concatenate((self.Y, Y))
-        if len(X) > 24000:
-            arg = np.arange(len(self.X))
-            np.random.shuffle(arg)
-            arg = arg[-12000:]
-            self.X = self.X[arg]
-            self.Y = self.Y[arg]
-        self.reset()
-
-    def update(self):
-        N = len(self.X)
-        if N < 12000:
-            return
-        arg = np.arange(N)
-        np.random.shuffle(arg)
-        arg = arg[:12000]
-        self.network.epoch(self.X[arg], self.Y[arg], bsize=100)
 
 
 # noinspection PyUnusedLocal

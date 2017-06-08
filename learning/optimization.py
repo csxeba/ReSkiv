@@ -12,7 +12,7 @@ def cross_entropy2(A: np.ndarray, Y: np.ndarray):
 
 
 def mean_squared_error(A, Y):
-    return -np.sum((A - Y)**2)
+    return np.sum((A - Y)**2)
 
 
 class Optimizer(abc.ABC):

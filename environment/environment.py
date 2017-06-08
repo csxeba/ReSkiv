@@ -154,7 +154,7 @@ class Game:
         if not done:
             print()
             self.agent.update()
-        if self.agent.type == "clever":
+        if self.agent.type in ("q", "clever"):
             self.agent.network.save()
         print("\n-- END PROGRAM --")
 
@@ -228,7 +228,7 @@ class Headless(Game):
 
 def _default_reward_function(env):
     done = 0
-    rwd = 0.5 - env.player.distance(env.square) / env.maxdist
+    rwd = 0.
     if env.score():
         env.square = Square(*env.ballargs["square"])
         env.enemies.append(EnemyBall(*env.ballargs["enemy"]))

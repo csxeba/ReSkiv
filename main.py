@@ -59,7 +59,7 @@ player_speed, player_size, square_size, enemy_size = map(
     lambda x: GENERAL_SCALING_FACTOR*x,
     (player_speed, player_size, square_size, enemy_size)
 )
-screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))  # type: list[int]
+screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 
 # Please note two things about colors and screen size:
 # If you use the pixel values to teach the network,
@@ -149,28 +149,21 @@ def build_ann(inshape, outshape):
         Dense(neurons=300, lmbd=0.0), Tanh(),
         Dense(neurons=outshape, lmbd=0.0)
     ])
-    if agent_type == "q":
-        net.learn_batch = net.learn_regressor
     return net
 
 
 def keras_ann(inshape, outshape):
     from keras.models import Sequential
-    from keras.layers import Conv2D, Flatten, Dense
+    from keras.layers import Dense
 
-    if agent_is_convolutional:
-        inshape = (1, inshape[0] // 2, inshape[1] // 2)
+    inshape = inshape[0]*inshape[1]
 
     outact = "linear" if agent_type == "q" else "softmax"
     cost = "mse" if agent_type == "q" else "categorical_crossentropy"
 
     model = Sequential([
-        Conv2D(8, (6, 6), activation="relu", input_shape=inshape),
-        Conv2D(6, (3, 3), activation="relu"),
-        Conv2D(4, (3, 3), activation="relu"),
-        Conv2D(2, (3, 3), activation="relu"),
-        Flatten(),
-        Dense(120, activation="tanh"),
+        Dense(300, activation="relu", input_dim=inshape),
+        Dense(120, activation="relu"),
         Dense(outshape, activation=outact)
     ])
     model.compile(optimizer="adam", loss=cost)
@@ -197,14 +190,14 @@ def get_agent(env, get_network):
     from learning import optimization
     network = get_network(env.data_shape, len(env.actions))
     actor = {
-        "clever": agent.CleverAgent,
+        "clever": agent.PolicyLearningAgent,
         "keras": agent.KerasAgent,
         "manual": agent.ManualAgent,
         "recorded": agent.RecordAgent,
         "saved": agent.SavedAgent,
         "online": agent.OnlineAgent,
         "spazz": agent.SpazzAgent,
-        "q": agent.QAgent,
+        "q": agent.QLearningAgent,
         "math": agent.MathAgent
     }[agent_type](game=env, speed=player_speed, network=network,
                   scale=GENERAL_SCALING_FACTOR)
@@ -228,7 +221,7 @@ def main():
         "keras": keras_ann,
         "online": build_ann,
         "saved": build_ann,
-        "q": build_ann
+        "q": keras_ann
     }.get(agent_type, lambda *args: None)
 
     # the "agent" variable name was already taken by the "agent" module :(
