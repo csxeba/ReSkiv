@@ -35,7 +35,7 @@ DARK_GREY = (50, 50, 50)
 LIGHT_GREY = (100, 100, 100)
 
 # Parameters of the environment
-fps = 210  # the higher, the faster the game's pace
+fps = 30  # the higher, the faster the game's pace
 player_speed = 7  # the higher, the faster the player
 
 # State determines what input we give to the neural net
@@ -46,6 +46,7 @@ state = "pixels"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
+headless = False
 player_size, player_color = 10, DARK_GREY
 square_size, square_color = 10, LIGHT_GREY
 enemy_size, enemy_color = 5, BLUE
@@ -79,7 +80,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
 # "saved" prompts you to select a saved agent.
-agent_type = "q"
+agent_type = "math"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Keras.
@@ -215,7 +216,8 @@ def main():
     env = Game(fps=fps, screensize=screen, state=state,
                playersize=player_size, playercolor=player_color,
                enemysize=enemy_size, enemycolor=enemy_color,
-               squaresize=square_size, squarecolor=square_color)
+               squaresize=square_size, squarecolor=square_color,
+               headless=headless)
     get_ann = {
         "clever": build_ann,
         "keras": keras_ann,

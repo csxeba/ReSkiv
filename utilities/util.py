@@ -2,6 +2,10 @@ import numpy as np
 from scipy.ndimage import distance_transform_edt as dte
 
 
+def normalize(*vectors, k=1):
+    return [np.nan_to_num(vector / np.linalg.norm(vector)) * k for vector in vectors]
+
+
 def calc_meand(screensize):
     """
     Calculates the mean euclidean distance between
@@ -67,10 +71,19 @@ def prepro_hills(game, ds=2):
     valleys[tuple(game.square.coords // ds)] = 0.
 
     peaks = dte(peaks) + 1e-5
-    peaks = (peaks / game.maxdist) ** -1.5
+    peaks = (peaks / game.maxdist)
     valleys = dte(valleys) + 1e-5
-    valleys = (valleys / game.maxdist) ** -1.5
+    valleys = (valleys / game.maxdist)
     return peaks - valleys
+
+
+def myproximity(game, ds):
+    hills = prepro_hills(game, ds=ds)
+
+    pc = tuple(game.player.coords // ds)
+    px, py = pc
+
+    return hills[px-1:px+1, py-1:py+1]
 
 
 def calculate_gradient(game, ds, deg=1):
@@ -92,6 +105,25 @@ def calculate_gradient(game, ds, deg=1):
     grads = [np.array([g[0].mean(), g[1].mean()]) for g in grads[1:]]
 
     return grads[0] if deg == 1 else grads
+
+
+def proximity_gradient_sream(game, ds):
+    grads = np.gradient(myproximity(game, ds))
+    while 1:
+        yield grads
+        grads = np.gradient(myproximity(game, ds))
+        grads = np.array([grads[0].mean(), grads[1].mean()])
+
+
+def time_gradient_stream(game, ds):
+    prox0 = myproximity(game, ds)
+    nabla = np.array([0., 0.])
+    while 1:
+        yield nabla
+        prox1 = myproximity(game, ds)
+        nabla = np.diff(prox1 - prox0)
+        nabla = np.array([nabla[0].mean(), nabla[1].mean()])
+        prox0 = prox1
 
 
 def discount_rewards(rwd, gamma=0.99):

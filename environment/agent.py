@@ -4,8 +4,8 @@ import numpy as np
 import pygame
 
 from utilities import (
-    discount_rewards, prepro_recurrent, prepro_convolutional,
-    calculate_gradient
+    discount_rewards, prepro_recurrent, prepro_convolutional, normalize,
+    proximity_gradient_sream, time_gradient_stream, calculate_gradient
 )
 from learning.experience import Experience
 from learning.optimization import Adam, cross_entropy
@@ -318,6 +318,11 @@ class MathAgent(AgentBase):
         self.prevstate = np.random.randn(5,)
         self.velocity = np.zeros((2,))
         self.memory = np.zeros((2,))
+        self.proxy_grads = proximity_gradient_sream(game, 4)
+        self.time_grads = time_gradient_stream(game, 4)
+
+    def prime(self):
+        next(self.proxy_grads), next(self.time_grads)
 
     def sample_vector_direct_vectors(self, state, prev_reward):
         self.velocity *= 0.8
@@ -350,8 +355,8 @@ class MathAgent(AgentBase):
         danger = self.game.meandist / self.game.maxdist
         if state[-1] > danger / 2.:
             # descend on the square directly
-            return np.sign(state[2:4] - state[:2]) * self.speed
-        return -np.sign(calculate_gradient(self.game, 2*self.scale, 1)) * self.speed
+            return normalize(state[2:4] - state[:2], k=self.speed)[0]
+        return -normalize(calculate_gradient(self.game, 2*self.scale, 1), k=self.speed)[0]
 
     def sample_vector_grad_momentum(self, state, prev_reward):
         state = self.game.statistics()
@@ -372,22 +377,27 @@ class MathAgent(AgentBase):
 
     def sample_vector_grad_momentum2(self, state, prev_reward):
         state = self.game.statistics()
-        grad1, grad2 = calculate_gradient(self.game, 2*self.scale, 2)
-        square_vec = ((state[:2] - state[2:4]) / 2.)
-        epsilon_vec = np.random.uniform(-self.speed, self.speed, 2)
+        pgrad, tgrad, square_vec, epsilon_vec = normalize(
+            next(self.proxy_grads),
+            next(self.time_grads),
+            state[:2] - state[2:4],
+            np.random.uniform(size=2)
+        )
 
-        g1coef = 0.2
-        g2coef = -(1. - g1coef)
+        pgcoef = 1.0
+        tgcoef = 1.0
         closest_enemy_distance = 1. / state[-1]**0.2
-        decay_v = 0.8
-        epsilon_factor = 0.5
+        decay_v = 0.9
+        epsilon_factor = 0.2
+
+        delta = (
+            epsilon_vec * epsilon_factor +
+            tgrad*tgcoef + pgrad*pgcoef +
+            square_vec * closest_enemy_distance
+        )
 
         self.velocity *= decay_v
-        self.velocity += (
-            epsilon_vec * epsilon_factor +
-            grad1*g1coef - grad2*(1.-g2coef) +
-            square_vec * closest_enemy_distance * self.speed
-        )
+        self.velocity += np.nan_to_num(normalize(delta*self.speed, k=5)[0])
         self.velocity = np.clip(self.velocity, -self.speed, self.speed)
 
         return -self.velocity
