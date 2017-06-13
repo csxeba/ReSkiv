@@ -1,6 +1,8 @@
-from environment.ball import *
-from utilities.util import calc_meand, downsample
-
+from .ball import *
+from utilities.util import (
+    calc_meand, downsample, steep_hills,
+    proximity_gradient_sream, time_gradient_stream
+)
 BLUE = (0, 0, 200)
 DARK_GREY = (50, 50, 50)
 LIGHT_GREY = (100, 100, 100)
@@ -11,7 +13,7 @@ class Game:
     def __init__(self, fps, screensize, state="statistics",
                  playersize=10, enemysize=5, squaresize=10,
                  playercolor=DARK_GREY, enemycolor=BLUE, squarecolor=LIGHT_GREY,
-                 reward_function=None, downsmpl=True):
+                 reward_function=None, downsmpl=True, headless=False):
 
         pygame.init()
         self.ballargs = {
@@ -22,7 +24,11 @@ class Game:
         self.size = np.array(screensize, dtype=int)
         self.meandist = calc_meand(self.size)
         self.maxdist = np.linalg.norm(self.size)
-        self.screen = pygame.display.set_mode(self.size)
+        if headless:
+            pygame.display.set_mode((1, 1), 0, 32)
+            self.screen = pygame.Surface(self.size)
+        else:
+            self.screen = pygame.display.set_mode(self.size)
         self.clock = pygame.time.Clock()
         self.fps = fps
         self.agent = None
@@ -93,6 +99,8 @@ class Game:
         self.square = Square(*self.ballargs["square"]).draw()
         self.enemies = [EnemyBall(*self.ballargs["enemy"]).draw() for _ in range(1)]
         self.points = 0.
+        if hasattr(agent, "prime"):
+            agent.prime()
         return self.step(np.array([0, 0]))[0]
 
     def score(self):
@@ -101,6 +109,7 @@ class Game:
     def step(self, dvec):
 
         self.screen.fill((0, 0, 0))
+        steep_hills(self)
         # hills = pygame.pixelcopy.make_surface(steep_hills(self))
         # self.screen.blit(hills, (0, 0))
 
@@ -210,6 +219,7 @@ class Headless(Game):
         self.reward_function = (_default_reward_function
                                 if reward_function is None else
                                 reward_function)
+        self.proxy_grads = proximity_gradient_stream()
 
     def pixels(self):
         raise NotImplementedError
