@@ -392,14 +392,14 @@ class MathAgent(AgentBase):
         )
 
         pgcoef = 1.0
-        tgcoef = 1.0
+        tgcoef = 0.0
         closest_enemy_distance = 1. / state[-1]**0.2
         decay_v = 0.9
         epsilon_factor = 0.2
 
         delta = (
             epsilon_vec * epsilon_factor +
-            tgrad*tgcoef + pgrad*pgcoef +
+            tgrad*-tgcoef + pgrad*pgcoef +
             square_vec * closest_enemy_distance
         )
 
