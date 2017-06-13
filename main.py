@@ -42,7 +42,7 @@ player_speed = 7  # the higher, the faster the player
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "pixels"
+state = "proximity"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
 screen = "500x400"
@@ -139,30 +139,29 @@ def build_ann(inshape, outshape):
     be careful! ReLU can't be put immediately before
     the output layer, because it causes overflow error.
     """
-    from learning.ann import Network, Dense, Tanh
+    from learning.ann import Network, Dense, Tanh, Softmax
 
     if agent_type == "online":
         inshape = (screen[0] * screen[1]) // (16 * GENERAL_SCALING_FACTOR**2)
         if exists("online.agent"):
             return Network.load("online.agent")
-    net = Network(inshape, layers=[
-        Dense(neurons=300, lmbd=0.0), Tanh(),
-        Dense(neurons=outshape, lmbd=0.0)
-    ])
-    return net
+    layers = [Dense(neurons=300, lmbd=0.0), Tanh(),
+              Dense(neurons=outshape, lmbd=0.0)]
+    if agent_type != "q":
+        layers.append(Softmax())
+
+    return Network(inshape, layers=layers)
 
 
 def keras_ann(inshape, outshape):
     from keras.models import Sequential
     from keras.layers import Dense
 
-    inshape = inshape[0]*inshape[1]
-
     outact = "linear" if agent_type == "q" else "softmax"
     cost = "mse" if agent_type == "q" else "categorical_crossentropy"
 
     model = Sequential([
-        Dense(300, activation="relu", input_dim=inshape),
+        Dense(300, activation="relu", input_dim=inshape[0]),
         Dense(120, activation="relu"),
         Dense(outshape, activation=outact)
     ])

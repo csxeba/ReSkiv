@@ -158,7 +158,7 @@ class PolicyLearningAgent(AgentBase):
         self.rewards = []
 
     def sample_vector(self, state, prev_reward):
-        X = state[None, :]
+        X = state.ravel()[None, :]
         self.rewards.append(prev_reward)
         probs = self.network.prediction(X)[0]
         direction, label = self.game.sample_action(probs)
@@ -210,7 +210,14 @@ class QLearningAgent(AgentBase):
     type = "q"
 
     def __init__(self, game, speed, network, scale):
-        assert network is not None
+        from keras.models import Sequential
+        from keras.layers import Dense
+        network = Sequential([
+            Dense(500, activation="tanh", input_dim=20**2 + 5),
+            Dense(120, activation="tanh"),
+            Dense(len(game.actions), activation="linear")
+        ])
+        network.compile("adam", "mse")
         super().__init__(game, speed, network, scale)
         self.S = []
         self.Qs = []
@@ -225,7 +232,7 @@ class QLearningAgent(AgentBase):
         self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
 
     def sample_vector(self, state, prev_reward):
-        S = state.ravel()
+        S = np.append(self.game.proximity().ravel(), self.game.statistics())
         self.S.append(S)
         self.R.append(prev_reward)
         Q = self.network.predict(S[None, ...])[0]
@@ -248,7 +255,7 @@ class QLearningAgent(AgentBase):
         self.reset()
 
     def update(self):
-        X, Y = self.xp.get_batch(5000)
+        X, Y = self.xp.get_batch(15000)
         self.network.fit(X, Y, epochs=1, batch_size=300)
 
 

@@ -3,7 +3,7 @@ import numpy as np
 
 class Experience:
 
-    def __init__(self, limit=10000):
+    def __init__(self, limit=40000):
         self.limit = limit
         self.X = None
         self.Y = None

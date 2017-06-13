@@ -37,14 +37,17 @@ class Game:
                         ( 0, -1), ( 0, 0), ( 0, 1),
                         (+1, -1), (+1, 0), (+1, 1)]
         self.labels = np.eye(len(self.actions))
-        if state not in ("statistics", "pixels"):
-            raise RuntimeError("State should be one of: [statistics, pixels]")
+        if state not in ("statistics", "pixels", "proximity"):
+            raise RuntimeError("State should be one of: [statistics, pixels, proximity]")
         self._state_str = state
-        self.state = self.pixels if state == "pixels" else self.statistics
-        self.data_shape = (
-            tuple(self.size // (4 if downsmpl else 1))
-            if state == "pixels" else (5,)
-        )
+        self.state = {"pixels": self.pixels,
+                      "statistics": self.statistics,
+                      "proximity": self.proximity}[state]
+        prxs = ((playersize*4*2)**2) // (4 if downsmpl else 1)
+        self.data_shape = {
+            "pixels": tuple(self.size // (4 if downsmpl else 1)),
+            "statistics": (5,),
+            "proximity": (prxs,)}[state]
         self.reward_function = (
             _default_reward_function if reward_function is None else reward_function
         )
@@ -68,6 +71,19 @@ class Game:
         enemies = min(self.player.distance(enemy) / self.maxdist
                       for enemy in self.enemies)
         return np.array(list(pcoords) + list(scoords) + [enemies])
+
+    def proximity(self):
+        proxysz = self.ballargs["player"][-1]*4
+        pcoords = self.player.coords
+        snw = np.maximum(proxysz - pcoords, 0)
+        sse = np.maximum(pcoords + proxysz - self.size, 0)
+        px0, py0 = pcoords - (proxysz - snw)
+        px1, py1 = pcoords + (proxysz - sse)
+        proxy = pygame.surfarray.array3d(self.screen)[px0:px1, py0:py1, 2].astype(float)
+        proxy /= 255.
+        state = np.pad(proxy, ((snw[0], sse[0]), (snw[1], sse[1])),
+                       mode="constant", constant_values=-1.)
+        return state[::4, ::4] if self.downsample else state
 
     def reset(self, agent=None):
         self.agent = agent if self.agent is None else self.agent
