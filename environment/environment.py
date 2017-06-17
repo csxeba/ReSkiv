@@ -104,7 +104,13 @@ class Game:
         return self.step(np.array([0, 0]))[0]
 
     def score(self):
-        return self.player.touches(self.square)
+        scbool = self.player.touches(self.square)
+        if scbool:
+            self.square = Square(*self.ballargs["square"])
+            self.enemies.append(EnemyBall(*self.ballargs["enemy"]))
+            self.points += 5.
+
+        return scbool
 
     def step(self, dvec):
 
@@ -137,7 +143,7 @@ class Game:
         self.steps_taken = 0  # a step is a single frame
         self.episodes = 1  # an episode is one game
         tock = self.fps
-        state = self.reset()  # state is either the pixels or the statistics
+        state = self.reset()
         reward = None
         reward_sum = 0.
         running_reward = None
@@ -184,81 +190,61 @@ class Game:
         print("\n-- END PROGRAM --")
 
 
-class Headless(Game):
+class NoEnemyGame(Game):
 
-    def __init__(self, fps, screensize, state="statistics",
-                 playersize=10, enemysize=5, squaresize=10,
-                 playercolor=DARK_GREY, enemycolor=BLUE, squarecolor=LIGHT_GREY,
-                 reward_function=None):
-
-        self.ballargs = {
-            "player": (self, playercolor, playersize),
-            "enemy": (self, enemycolor, enemysize),
-            "square": (self, squarecolor, squaresize)
-        }
-        self.size = np.array(screensize, dtype=int)
-        self.meandist = calc_meand(self.size)
-        self.maxdist = np.linalg.norm(self.size)
-        self.agent = None
-        self.player = None
-        self.square = None
-        self.enemies = None
-        self.points = 0.
-        self.nopoints = 0
-        self.steps_taken = 0
-        self.episodes = 0
-        self.actions = [(-1, -1), (-1, 0), (-1, 1),
-                        (0, -1), (0, 0), (0, 1),
-                        (1, -1), (1, 0), (1, 1)]
-        self.labels = np.eye(len(self.actions))
-        if state != "statistics":
-            raise RuntimeError("Headless mode only supports 'statistics' state!")
-        self._state_str = state
-        self.state = self.statistics
-        self.data_shape = (5,)
-        self.reward_function = (_default_reward_function
-                                if reward_function is None else
-                                reward_function)
-        self.proxy_grads = proximity_gradient_stream()
-
-    def pixels(self):
-        raise NotImplementedError
+    def score(self):
+        scbool = self.player.touches(self.square)
+        if scbool:
+            self.square = Square(*self.ballargs["square"])
+            self.points += 5
+        return scbool
 
     def reset(self, agent=None):
         self.agent = agent if self.agent is None else self.agent
         if self.agent is None:
             raise RuntimeError("Please instantiate and pass one of the Agents!")
-        self.player = PlayerBall(*self.ballargs["player"])
-        self.square = Square(*self.ballargs["square"])
-        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
+        self.player = PlayerBall(*self.ballargs["player"]).draw()
+        self.square = Square(*self.ballargs["square"]).draw()
+        self.enemies = []
         self.points = 0.
+        if hasattr(agent, "prime"):
+            agent.prime()
         return self.step(np.array([0, 0]))[0]
 
-    def progression(self, tock):
-        pass
 
-    def check_quit(self):
-        pass
+class NoSquareGame(Game):
 
-    def step(self, dvec):
+    def score(self):
+        scbool = self.steps_taken % 200 == 0 and self.steps_taken > 0
+        if scbool:
+            self.enemies.append(EnemyBall(*self.ballargs["enemy"]))
+            self.points += 5
+        return scbool
 
-        self.square.draw()
-        self.player.move(dvec)
+    def reset(self, agent=None):
+        self.agent = agent if self.agent is None else self.agent
+        if self.agent is None:
+            raise RuntimeError("Please instantiate and pass one of the Agents!")
+        self.player = PlayerBall(*self.ballargs["player"]).draw()
+        self.square = None
+        self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
+        self.points = 0.
+        if hasattr(agent, "prime"):
+            agent.prime()
+        return self.step(np.array([0, 0]))[0]
 
-        reward, done = self.reward_function(self)
-
-        for e in self.enemies:
-            e.move()
-        return self.state(), reward, done
+    def reward_function(self, env):
+        if self.score():
+            return 1, 0
+        if self.player.dead():
+            return -1, 1
+        return 0, 0
 
 
 def _default_reward_function(env):
     done = 0
     rwd = 0.
     if env.score():
-        env.square = Square(*env.ballargs["square"])
-        env.enemies.append(EnemyBall(*env.ballargs["enemy"]))
-        env.points += 5.
         rwd = 9.
     if env.player.dead():
         done = 1
