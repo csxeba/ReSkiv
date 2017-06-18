@@ -54,9 +54,6 @@ class Game:
             "pixels": tuple(self.size // (4 if downsmpl else 1)),
             "statistics": (5,),
             "proximity": (prxs,)}[state]
-        self.reward_function = (
-            _default_reward_function if reward_function is None else reward_function
-        )
         self.downsample = downsmpl
 
     def sample_action(self, prob):
@@ -115,7 +112,7 @@ class Game:
     def step(self, dvec):
 
         self.screen.fill((0, 0, 0))
-        steep_hills(self)
+        # steep_hills(self)
         # hills = pygame.pixelcopy.make_surface(steep_hills(self))
         # self.screen.blit(hills, (0, 0))
 
@@ -123,7 +120,7 @@ class Game:
         self.player.move(dvec)
         self.player.draw()
 
-        reward, done = self.reward_function(self)
+        reward, done = self.reward_function()
 
         for e in self.enemies:
             e.move()
@@ -186,8 +183,20 @@ class Game:
             print()
             self.agent.update()
         if self.agent.type in ("q", "clever"):
-            self.agent.network.save()
+            self.agent.network.save(self.agent.type.capitalize() + "Agent.brain")
         print("\n-- END PROGRAM --")
+
+    def reward_function(self):
+        done = 0
+        rwd = 0.
+        if self.score():
+            rwd = 9.
+        if self.player.dead():
+            done = 1
+            rwd = -2.
+        if self.player.escaping():
+            rwd = -2.
+        return rwd, done
 
 
 class NoEnemyGame(Game):
@@ -211,8 +220,68 @@ class NoEnemyGame(Game):
             agent.prime()
         return self.step(np.array([0, 0]))[0]
 
+    def mainloop(self, max_steps=3000):
+        self.steps_taken = 0  # a step is a single frame
+        self.episodes = 1  # an episode is one game
+        tock = self.fps
+        state = self.reset()
+        reward = None
+        reward_sum = 0.
+        running_reward = None
+        done = 0
+        print("Episode: 1")
+        while 1:
+            self.steps_taken += 1
+
+            if self.check_quit():
+                break
+
+            action = self.agent.sample_vector(state, reward)
+            state, reward, done = self.step(action)
+
+            reward_sum += reward
+            if running_reward is None:
+                running_reward = reward_sum
+
+            print("\rStep count: {:>5}, Current reward: {: .3f}, Current points: {:.0f}"
+                  .format(self.steps_taken, reward, self.points),
+                  end="")
+
+            if self.steps_taken >= 3000:
+                self.episodes += 1
+                self.steps_taken = 0
+                print()
+                self.agent.accumulate(reward)
+            elif self.steps_taken % 200 == 0 and self.steps_taken > 0:
+                print()
+                self.agent.update_on_batch()
+
+            if self.episodes % 5 == 0:
+                self.agent.update()
+            self.progression(tock)
+
+        if not done:
+            print()
+            self.agent.update()
+        if self.agent.type in ("q", "clever"):
+            self.agent.network.save()
+        print("\n-- END PROGRAM --")
+
+    def reward_function(self):
+        rwd = 0.
+        if self.score():
+            rwd = 1.
+        if self.player.escaping():
+            rwd = -1.
+        return rwd, 0
+
 
 class NoSquareGame(Game):
+
+    def __init__(self, fps, screensize, **kw):
+
+        super().__init__(fps, screensize, **kw)
+        self.square = NoSquareGame.SquareMock()
 
     def score(self):
         scbool = self.steps_taken % 200 == 0 and self.steps_taken > 0
@@ -226,29 +295,20 @@ class NoSquareGame(Game):
         if self.agent is None:
             raise RuntimeError("Please instantiate and pass one of the Agents!")
         self.player = PlayerBall(*self.ballargs["player"]).draw()
-        self.square = None
+        self.square = NoSquareGame.SquareMock()
         self.enemies = [EnemyBall(*self.ballargs["enemy"]) for _ in range(1)]
         self.points = 0.
         if hasattr(agent, "prime"):
             agent.prime()
         return self.step(np.array([0, 0]))[0]
 
-    def reward_function(self, env):
+    def reward_function(self):
         if self.score():
             return 1, 0
         if self.player.dead():
             return -1, 1
         return 0, 0
 
-
-def _default_reward_function(env):
-    done = 0
-    rwd = 0.
-    if env.score():
-        rwd = 9.
-    if env.player.dead():
-        done = 1
-        rwd = -2.
-    if env.player.escaping():
-        rwd = -2.
-    return rwd, done
+    class SquareMock:
+        def draw(self):
+            pass

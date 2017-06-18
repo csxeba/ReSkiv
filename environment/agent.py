@@ -210,29 +210,50 @@ class QLearningAgent(AgentBase):
     type = "q"
 
     def __init__(self, game, speed, network, scale):
-        from keras.models import Sequential
-        from keras.layers import Dense
-        network = Sequential([
-            Dense(500, activation="tanh", input_dim=20**2 + 5),
-            Dense(120, activation="tanh"),
-            Dense(len(game.actions), activation="linear")
-        ])
-        network.compile("adam", "mse")
+        network = self._build_net(game)
         super().__init__(game, speed, network, scale)
+        self.target_network = self._build_net(game)
         self.S = []
         self.Qs = []
         self.R = []
         self.A = []
-        self.xp = Experience()
+        self.xp = Experience(9000)
 
         self.epsilon = 0.1
+        self.tau = 0.1
         self.recurrent = False
+        self.target_updates = 1
+
+    def _build_net(self, game):
+        from keras.models import Sequential
+        from keras.layers import Dense, Conv2D, MaxPool2D, Activation, Flatten
+
+        # inputs: 1x75x50
+        network = Sequential([
+            Conv2D(6, (3, 3), activation="relu",  # 6x72x48
+                   input_shape=(1, 75, 50), data_format="channels_first"),
+            Conv2D(8, (3, 3), data_format="channels_first"),  # 8x70x46
+            MaxPool2D(),  # 8x35x23
+            Activation("relu"),
+            Conv2D(8, (6, 4), activation="relu", data_format="channels_first"),  # 8x30x20
+            Conv2D(12, (3, 3), data_format="channels_first"),  # 8x28x18
+            MaxPool2D(),  # 12x14x9
+            Activation("relu"),
+            Conv2D(12, (3, 4), activation="relu", data_format="channels_first"),  # 12x12x6
+            Conv2D(3, (3, 3), activation="relu", data_format="channels_first"),  # 3x10x4
+            Flatten(),
+            Dense(300, activation="tanh"),
+            Dense(120, activation="tanh"),
+            Dense(len(game.actions), activation="linear")
+        ])
+        network.compile("adam", "mse")
+        return network
 
     def reset(self):
         self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
 
     def sample_vector(self, state, prev_reward):
-        S = np.append(self.game.proximity().ravel(), self.game.statistics())
+        S = state
         self.S.append(S)
         self.R.append(prev_reward)
         Q = self.network.predict(S[None, ...])[0]
@@ -243,8 +264,7 @@ class QLearningAgent(AgentBase):
         return np.array(self.game.actions[ix]) * self.speed
 
     def accumulate(self, rewards):
-        X = np.vstack(self.S)
-        X = X[:-1]
+        X = np.stack(self.S[:-1], axis=0)
         R = discount_rewards(np.array(self.R[1:]))
         Y = np.vstack(self.Qs[:-1])
         ixs = tuple(self.A[1:])
@@ -252,11 +272,27 @@ class QLearningAgent(AgentBase):
         rwd = R + Y.max(axis=1)
         Y[:, ixs] = rwd
         self.xp.accumulate(X, Y)
+        self.update_on_batch()
         self.reset()
 
-    def update(self):
-        X, Y = self.xp.get_batch(15000)
+    def update_on_batch(self):
+        X, Y = self.xp.get_batch(200)
+        N = len(X)
+        if not N:
+            return
         self.network.fit(X, Y, epochs=1, batch_size=300)
+
+    def update(self):
+        actorW = self.network.get_weights()
+        targetW = self.target_network.get_weights()
+        for i in range(len(actorW)):
+            targetW[i] = actorW[i] * self.tau + (1. - self.tau) * targetW
+        self.target_network.set_weights(targetW)
+        self.target_updates += 1
+        if self.target_updates % 10 == 0:
+            self.network.set_weights(self.target_network.get_weights())
+            print("Performed knowledge transfer after {} target updates!"
+                  .format(self.target_updates))
 
 
 class KerasAgent(AgentBase):

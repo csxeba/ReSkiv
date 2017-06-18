@@ -5,8 +5,8 @@ class Experience:
 
     def __init__(self, limit=40000):
         self.limit = limit
-        self.X = None
-        self.Y = None
+        self.X = []
+        self.Y = []
 
     @property
     def N(self):
@@ -35,7 +35,8 @@ class Experience:
             self.Y = self.Y[narg]
 
     def accumulate(self, X, Y):
-        if self.X is None:
+        assert len(X) == len(Y)
+        if len(self.X) < 1:
             self.initialize(X, Y)
         else:
             self.incorporate(X, Y)
@@ -48,4 +49,6 @@ class Experience:
         narg = np.arange(self.N)
         np.random.shuffle(narg)
         marg = narg[:m]
+        if len(marg) == 0:
+            return [], []
         return self.X[marg], self.Y[marg]

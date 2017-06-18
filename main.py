@@ -23,7 +23,7 @@ action.
 """
 
 from os.path import exists
-from environment import Game, agent
+from environment import Game, NoEnemyGame, NoSquareGame, agent
 
 #####################
 # Parameters to set #
@@ -42,10 +42,11 @@ player_speed = 7  # the higher, the faster the player
 # can be either one of the following:
 # - "statistics" gives coordinates and distances of entities
 # - "pixels" gives pixel values
-state = "proximity"
+# - "proximity" gives the pixel values next to the player ball
+state = "pixels"
 
 # Because of a 4-wise downsampling, each dimension has to be divisible by 4!
-screen = "500x400"
+screen = "300x200"
 headless = False
 player_size, player_color = 10, DARK_GREY
 square_size, square_color = 10, LIGHT_GREY
@@ -80,7 +81,7 @@ screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 # "recorded" records your actions while you play.
 # "online" learns as YOU play and also records your actions.
 # "saved" prompts you to select a saved agent.
-agent_type = "math"
+agent_type = "q"
 
 # Please set these if you intend to use one of the recurrent
 # or convolutional layer architectures in Keras.
@@ -212,7 +213,7 @@ def get_agent(env, get_network):
 
 
 def main():
-    env = Game(fps=fps, screensize=screen, state=state,
+    env = NoEnemyGame(fps=fps, screensize=screen, state=state,
                playersize=player_size, playercolor=player_color,
                enemysize=enemy_size, enemycolor=enemy_color,
                squaresize=square_size, squarecolor=square_color,
