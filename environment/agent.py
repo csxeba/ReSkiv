@@ -185,11 +185,14 @@ class PolicyLearningAgent(AgentBase):
 
         net_cost = cross_entropy(preds, Ys) / m
         print("{: .4f}".format(net_cost * drwds.mean()))
-        delta = (preds - Ys) * drwds[:, None] / m
+        delta = (preds - Ys) * drwds[nz, None] / m
         self.network.backpropagation(delta)
         self.gradients += self.network.get_gradients()
         self.ngrads += 1
         self.reset()
+
+    def update_on_batch(self):
+        pass
 
     def update(self):
         if not self.ngrads:
@@ -210,44 +213,18 @@ class QLearningAgent(AgentBase):
     type = "q"
 
     def __init__(self, game, speed, network, scale):
-        network = self._build_net(game)
         super().__init__(game, speed, network, scale)
-        self.target_network = self._build_net(game)
+        self.target_network = network.get_weights()
         self.S = []
         self.Qs = []
         self.R = []
         self.A = []
         self.xp = Experience(9000)
 
-        self.epsilon = 0.1
-        self.tau = 0.1
-        self.recurrent = False
+        self.epsilon = 0.1  # random exploration rate
+        self.tau = 0.1  # knowledge transfer rate
+        self.gamma = 0.9  # discount factor for rewards
         self.target_updates = 1
-
-    def _build_net(self, game):
-        from keras.models import Sequential
-        from keras.layers import Dense, Conv2D, MaxPool2D, Activation, Flatten
-
-        # inputs: 1x75x50
-        network = Sequential([
-            Conv2D(6, (3, 3), activation="relu",  # 6x72x48
-                   input_shape=(1, 75, 50), data_format="channels_first"),
-            Conv2D(8, (3, 3), data_format="channels_first"),  # 8x70x46
-            MaxPool2D(),  # 8x35x23
-            Activation("relu"),
-            Conv2D(8, (6, 4), activation="relu", data_format="channels_first"),  # 8x30x20
-            Conv2D(12, (3, 3), data_format="channels_first"),  # 8x28x18
-            MaxPool2D(),  # 12x14x9
-            Activation("relu"),
-            Conv2D(12, (3, 4), activation="relu", data_format="channels_first"),  # 12x12x6
-            Conv2D(3, (3, 3), activation="relu", data_format="channels_first"),  # 3x10x4
-            Flatten(),
-            Dense(300, activation="tanh"),
-            Dense(120, activation="tanh"),
-            Dense(len(game.actions), activation="linear")
-        ])
-        network.compile("adam", "mse")
-        return network
 
     def reset(self):
         self.S, self.A, self.Qs, self.R = [[] for _ in range(4)]
@@ -265,7 +242,7 @@ class QLearningAgent(AgentBase):
 
     def accumulate(self, rewards):
         X = np.stack(self.S[:-1], axis=0)
-        R = discount_rewards(np.array(self.R[1:]))
+        R = discount_rewards(np.array(self.R[1:]), gamma=self.gamma)
         Y = np.vstack(self.Qs[:-1])
         ixs = tuple(self.A[1:])
         Y[-1, self.A[-1]] = rewards
@@ -283,14 +260,13 @@ class QLearningAgent(AgentBase):
         self.network.fit(X, Y, epochs=1, batch_size=300)
 
     def update(self):
+        print("Performing target network update!")
         actorW = self.network.get_weights()
-        targetW = self.target_network.get_weights()
         for i in range(len(actorW)):
-            targetW[i] = actorW[i] * self.tau + (1. - self.tau) * targetW
-        self.target_network.set_weights(targetW)
+            self.target_network[i] = actorW[i] * self.tau + (1. - self.tau) * self.target_network[i]
         self.target_updates += 1
         if self.target_updates % 10 == 0:
-            self.network.set_weights(self.target_network.get_weights())
+            self.network.set_weights(self.target_network)
             print("Performed knowledge transfer after {} target updates!"
                   .format(self.target_updates))
 

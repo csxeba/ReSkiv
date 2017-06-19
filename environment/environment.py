@@ -51,7 +51,7 @@ class Game:
                       "proximity": self.proximity}[state]
         prxs = ((playersize*4*2)**2) // (4 if downsmpl else 1)
         self.data_shape = {
-            "pixels": tuple(self.size // (4 if downsmpl else 1)),
+            "pixels": [1] + list(self.size // (4 if downsmpl else 1)),
             "statistics": (5,),
             "proximity": (prxs,)}[state]
         self.downsample = downsmpl
@@ -252,17 +252,16 @@ class NoEnemyGame(Game):
                 self.steps_taken = 0
                 print()
                 self.agent.accumulate(reward)
+                if self.episodes % 5 == 0:
+                    print()
+                    self.agent.update()
+
             elif self.steps_taken % 200 == 0 and self.steps_taken > 0:
                 print()
                 self.agent.update_on_batch()
 
-            if self.episodes % 5 == 0:
-                self.agent.update()
             self.progression(tock)
 
-        if not done:
-            print()
-            self.agent.update()
         if self.agent.type in ("q", "clever"):
             self.agent.network.save()
         print("\n-- END PROGRAM --")

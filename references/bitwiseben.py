@@ -3,7 +3,7 @@
  Source: https://github.com/bitwise-ben/Snake
  All right go to the respective owners.
  
- Trains an agent to play Snake. 
+ Trains an agent to play Snake via DQN
 """
 
 from collections import namedtuple

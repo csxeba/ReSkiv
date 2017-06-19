@@ -3,7 +3,7 @@
  Source: https://gist.github.com/karpathy/a4166c7fe253700972fcbc77e4ea32c5
  All right go to the respective owners.
  
- Trains an agent with (stochastic) Policy Gradients on Pong. Uses OpenAI Gym. 
+ Trains an agent with direct policy learning to play Pong. Uses OpenAI Gym.
 """
 
 import numpy as np

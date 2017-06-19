@@ -15,7 +15,7 @@ headless = False
 # The environment can be simplified.
 # - "nosquare" generates no squares, only enemies and the goal is survival
 # - "noenemy" generates no enemies, only the square, the goal is to reach the square
-game_simplification = None
+game_simplification = "noenemy"
 
 # Set this to make everything bigger
 # Be careful, setting to a non-integer
@@ -27,12 +27,12 @@ GENERAL_SCALING_FACTOR = 1
 # - "policy" is for direct policy learning (RL), learns a direct stochastic policy
 # - "dqn" is for Deep Q Learning (RL), approximates Q (quality) for every action given a state
 # - "online" learns a direct policy from a human playing the game (SL)
-agent_type = "dqn"
+agent_type = "policy"
 
 # Set the neural network type
 # - "FC" is fully connected, vanilla ANN (no lib dependency)
 # - "CNN" is a LeNet-like convolutional NN (keras & theano/tensorflow lib dependecies)
-ann_type = "CNN"
+ann_type = "FC"
 
 # State determines what input we give to the neural net
 # can be either one of the following:
@@ -41,6 +41,13 @@ ann_type = "CNN"
 # - "proximity" gives the pixel values around the player
 state = "pixels"
 downsampling = True  # strongly suggested. Reduces all input dims by a factor of 4
+
+
+player_speed, player_size, square_size, enemy_size = map(
+    lambda x: GENERAL_SCALING_FACTOR*x,
+    (player_speed, player_size, square_size, enemy_size)
+)
+screen = tuple(map(lambda x: int(x)*GENERAL_SCALING_FACTOR, screen.split("x")))
 
 
 def dense_ann(inshape, outshape):

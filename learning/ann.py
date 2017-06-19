@@ -80,14 +80,14 @@ class Dense(Trainable):
         self.inputs = None
 
     def connect(self, layer):
-        indim = layer.outdim
+        indim = np.prod(layer.outdim)
         if isinstance(indim, tuple):
             indim = np.prod(indim)
         self.W = np.random.randn(indim, self.neurons) / indim
         self.gW = np.zeros_like(self.W)
 
     def feedforward(self, X):
-        self.inputs = X
+        self.inputs = X.reshape(X.shape[0], np.prod(X.shape[1:]))
         return X.dot(self.W) + self.b
 
     def backpropagate(self, error):
