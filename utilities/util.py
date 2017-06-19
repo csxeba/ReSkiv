@@ -1,6 +1,10 @@
 import numpy as np
 from scipy.ndimage import distance_transform_edt as dte
 
+BLUE = (0, 0, 200)
+DARK_GREY = (50, 50, 50)
+LIGHT_GREY = (100, 100, 100)
+
 
 def normalize(*vectors, k=1):
     return [np.nan_to_num(vector / np.linalg.norm(vector)) * k for vector in vectors]

@@ -140,7 +140,7 @@ class SavedAgent(AgentBase):
 
 class PolicyLearningAgent(AgentBase):
 
-    type = "clever"
+    type = "policy"
 
     def __init__(self, game, speed, network, scale):
         super().__init__(game, speed, network, scale)
